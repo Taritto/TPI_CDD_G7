@@ -2,6 +2,8 @@
 
 **Estado de implementación:** parcial. La sección 3.7 del notebook informa violaciones lógicas de desviaciones estándar, recuentos de muestras válidas, fracciones y pureza, y comprueba la coherencia entre recuentos y fracciones de faltantes. Resume epochs y pacientes afectados, desglosa por etapa y conserva casos para rastrear en el CSV fuente. También describe ceros, cobertura y cuantiles de señales prioritarias sin convertirlos en topes. Se verificaron sintaxis y casos sintéticos con y sin violaciones. No se modifican datos ni se aplica clipping. Siguen pendientes la ejecución con registros completos, la confirmación de unidades/escala —especialmente SAO2—, la revisión de muestras crudas afectadas y cualquier límite o tratamiento específico.
 
+**SAO2 en 2.6.2:** se aclaró que los recuentos dependen de la cohorte ejecutada y que valores fuera de 0–1 no autorizan una conversión automática: primero debe confirmarse si el registro usa fracción, porcentaje u otra codificación, y revisar tramos de ceros y saltos. Solo una conversión uniforme y verificada se corregiría desde la fuente; un tramo defectuoso afectaría a SAO2, no a `Sleep_Stage` ni al paciente completo. Hasta resolver la causa, SAO2 permanece fuera de los predictores principales.
+
 Se separan tres conceptos: **rango válido por definición o escala**, **rango plausible según instrumento y contexto**, y **extremo estadístico**. Solo el primero permite una regla inequívoca una vez confirmadas unidades y transformaciones. Un extremo estadístico no es automáticamente error y no se recorta por defecto.
 
 ## Controles a implementar

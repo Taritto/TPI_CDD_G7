@@ -1,6 +1,6 @@
 # Detección y tratamiento de valores anómalos
 
-**Estado de implementación:** parcial. La sección 3.3.1 del notebook marca candidatos mediante 1,5 × IQR global en características disponibles de wearable y PSG; para HR, TEMP y EDA prioriza la mediana por epoch, y para BVP su dispersión. Resume epochs y pacientes afectados, proporciones por etapa, mínimos, percentiles 1 y 99, mediana, máximos, cobertura y valores de epochs vecinos contiguos del mismo paciente. La sección 3.3 dibuja también los candidatos en las cajas. Si el IQR es nulo o hay pocos valores, informa que no puede aplicar el criterio. No cambia el dataset ni aplica recortes, imputaciones, binning o exclusiones. Se verificó la sintaxis; falta ejecutar e interpretar el reporte sobre el dataset completo. El objetivo es detectar posibles errores sin confundir rareza estadística con medición incorrecta.
+**Estado de implementación:** diagnóstico ampliado, tratamientos pendientes. La sección 3.3.1 conserva el IQR global y ahora muestra límites con ocho cifras significativas, tres pacientes y tres tramos consecutivos prioritarios por variable, y cinco casos extremos por variable. Aclara que las cajas de 3.3 aplican IQR por etapa, por lo que sus puntos no coinciden necesariamente con la tabla global. Las tablas completas permanecen en memoria. Se verificó la lógica con datos sintéticos, incluido IQR nulo; falta ejecutar e interpretar el reporte con los pacientes reales. No cambia el dataset ni aplica recortes, imputaciones, binning o exclusiones.
 
 ## Alcance y orden de revisión
 
@@ -25,6 +25,12 @@ Un error confirmado puede motivar marcar el dato como faltante o excluir el epoc
 
 El *binning* no corrige un error de medición: discretiza valores y pierde resolución. Solo sería una característica experimental si hay una razón interpretable o una mejora validada por pacientes. Primero determinar si el extremo es artefacto, variación legítima o un cambio de escala; después comparar, sin modificar el dataset base, conservarlo, transformarlo o limitarlo mediante una regla documentada.
 
-## Cambio futuro a implementar
+## Pendientes de revisión — no implementados
 
-Completar el resumen de integridad y calidad por señal y revisar los gráficos globales de distribución junto con los candidatos generados. La lista en memoria contiene `patient_id`, `epoch`, variable, criterio IQR y contexto; no se guarda un CSV nuevo. Después de revisar resultados reales, acordar en otro paso límites concretos y tratamiento por variable. El mapa de calor puede complementar la revisión, pero no sustituye los controles anteriores ni convierte por sí solo un valor extremo en error.
+1. Inspeccionar casos dirigidos en señal cruda: EDA del paciente 4 en los epochs 729–755 y 797, el paciente que concentra TEMP baja y epochs con BVP alto junto con aceleración. Verificar continuidad, escala, contacto, cobertura y cambios de etapa. La muestra exploratoria de 18 pacientes no basta para fijar reglas globales.
+2. Clasificar los patrones observados como extremo plausible, artefacto confirmado, problema de escala o caso no resuelto. Registrar evidencia, pacientes, epochs y efecto potencial sobre cada etapa antes de definir un tratamiento.
+3. Solo después de aprobar una regla concreta, corregir desde la fuente o invalidar la señal afectada cuando corresponda, conservar el dataset original y comparar cobertura, dimensiones y distribución por etapa/paciente antes y después. Repetir la auditoría sobre el conjunto completo antes de generalizar. No se fija aún ningún límite de clipping o binning.
+
+**EDA en 2.6.4:** se documentó qué representa cada vista: rango entre pacientes, máximo, mayor salto entre muestras y acelerómetro simultáneo. No se corrigió el dataset: un valor elevado o un movimiento coincidente son hipótesis de revisión. Queda pendiente inspeccionar la forma cruda y el contexto de los tramos marcados en 3.3.1 antes de decidir si conservar EDA, corregir una escala confirmada o invalidar solo un tramo defectuoso.
+
+La lista en memoria conserva `patient_id`, `epoch`, variable, criterio IQR y contexto; no se guarda un CSV nuevo. El mapa de calor puede complementar la revisión, pero no sustituye los controles de calidad ni convierte un valor extremo en error.

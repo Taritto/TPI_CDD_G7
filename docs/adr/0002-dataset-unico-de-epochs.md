@@ -5,7 +5,7 @@ date: 2026-09-28
 
 # Generar un único dataset consolidado de epochs
 
-**Estado de implementación:** parcial. La sección 3.1 produce un único CSV de epochs ordenado por `patient_id` y `epoch`, más auditoría y detalle de descartes. No genera datasets completos por paciente ni `pacientes_pendientes.csv`. La ejecución anterior del usuario con 18 CSV locales produjo 13.165 epochs y 126 columnas, sin nulos ni descartes; esos números son históricos, anteriores al tratamiento de `Missing` y alineación del ADR 0012. El código actualizado conserva la salida única en `etl_v1/` local o `/kaggle/working/etl_v1/` en Kaggle y se verificó con datos sintéticos. Falta ejecutar de nuevo el conjunto real, en particular S027 y S048, y revisar los resultados científicos. Los CSV crudos no se tocaron. Parquet sigue recomendado, pero no implementado.
+**Estado de implementación:** parcial. La sección 3.1 produce un único CSV de epochs ordenado por `patient_id` y `epoch`, más auditoría y detalle de descartes. No genera datasets completos por paciente ni `pacientes_pendientes.csv`. La ejecución anterior del usuario con 18 CSV locales produjo 13.165 epochs y 126 columnas; esos números son históricos, anteriores al tratamiento de `Missing` y alineación del ADR 0012. La salida se conserva en `etl_v1/` local o `/kaggle/working/etl_v1/` en Kaggle. Se agregó reutilización de los tres CSV mediante un manifiesto que compara archivos fuente, tamaño, fecha de modificación y versión de reglas, seguida de validación de esquema y auditoría. Una salida antigua sin manifiesto se reconstruye una vez; se puede forzar una reconstrucción cambiando `FORZAR_RECALCULO_ETL`. Falta ejecutar el flujo completo con registros reales y revisar S027/S048. Los CSV crudos no se tocaron. Parquet sigue recomendado, pero no implementado.
 
 **Visualización de la auditoría:** la sección 3.2 muestra todas las filas de `auditoria_epochs`, tanto archivos incluidos como excluidos, sin el truncamiento habitual de pandas. Debajo resume cantidades por estado y enumera los archivos con incidencias para revisión, separando las etiquetas imputadas de los errores confirmados. Esta presentación quedó incorporada al notebook; falta ejecutarla con la cohorte definitiva.
 
@@ -17,6 +17,8 @@ El resultado principal será:
 
 - `dataset_epochs_v1.parquet`, como formato recomendado para conservar tipos y reducir tamaño;
 - `dataset_epochs_v1.csv`, cuando sea necesario entregar o inspeccionar un formato portable.
+
+La caché añade `manifest_etl_v1.json` como metadato técnico, no como entrada del modelo. Si cambian archivos, configuración o versión del ETL, se recalcula; si coinciden, se cargan el dataset, la auditoría y los descartes sin releer los CSV crudos. En una sesión nueva de Kaggle, `/kaggle/working` no garantiza persistencia por sí mismo: hay que volver a adjuntar la salida guardada para reutilizarla.
 
 No se generarán datasets completos separados por paciente. Los CSV crudos de origen permanecerán intactos y separados.
 
