@@ -1,6 +1,6 @@
 # Detección y tratamiento de valores anómalos
 
-**Estado de implementación:** parcial. La sección 3.3.1 del notebook marca candidatos mediante 1,5 × IQR global en características disponibles de wearable y PSG; resume epochs y pacientes afectados, proporciones por etapa, cobertura y valores de epochs vecinos contiguos del mismo paciente. Si el IQR es nulo o hay pocos valores, informa que no puede aplicar el criterio. No cambia el dataset ni aplica recortes, imputaciones o exclusiones. Se verificó la sintaxis y la lógica con un ejemplo sintético; falta ejecutar e interpretar el reporte sobre el dataset completo. El objetivo es detectar posibles errores sin confundir rareza estadística con medición incorrecta.
+**Estado de implementación:** parcial. La sección 3.3.1 del notebook marca candidatos mediante 1,5 × IQR global en características disponibles de wearable y PSG; para HR, TEMP y EDA prioriza la mediana por epoch, y para BVP su dispersión. Resume epochs y pacientes afectados, proporciones por etapa, mínimos, percentiles 1 y 99, mediana, máximos, cobertura y valores de epochs vecinos contiguos del mismo paciente. La sección 3.3 dibuja también los candidatos en las cajas. Si el IQR es nulo o hay pocos valores, informa que no puede aplicar el criterio. No cambia el dataset ni aplica recortes, imputaciones, binning o exclusiones. Se verificó la sintaxis; falta ejecutar e interpretar el reporte sobre el dataset completo. El objetivo es detectar posibles errores sin confundir rareza estadística con medición incorrecta.
 
 ## Alcance y orden de revisión
 
@@ -22,6 +22,8 @@
 ## Reglas de tratamiento pendientes de evidencia
 
 Un error confirmado puede motivar marcar el dato como faltante o excluir el epoch afectado; un artefacto probable puede justificar indicador de calidad, exclusión puntual o análisis de sensibilidad; un extremo plausible se conserva. Cualquier límite máximo o mínimo, incluida la saturación de valores extremos (*clipping*), necesita justificación por unidades, instrumento o desempeño validado **solo con pacientes de entrenamiento**. Si se ajustan umbrales estadísticos o transformaciones para el modelo, no usar pacientes de validación/prueba para calcularlos. Evaluar el impacto por clase y paciente para no eliminar desproporcionadamente etapas poco frecuentes.
+
+El *binning* no corrige un error de medición: discretiza valores y pierde resolución. Solo sería una característica experimental si hay una razón interpretable o una mejora validada por pacientes. Primero determinar si el extremo es artefacto, variación legítima o un cambio de escala; después comparar, sin modificar el dataset base, conservarlo, transformarlo o limitarlo mediante una regla documentada.
 
 ## Cambio futuro a implementar
 
