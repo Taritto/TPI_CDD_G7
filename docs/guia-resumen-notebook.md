@@ -164,6 +164,10 @@ La AUC de rangos compara una etapa frente a las otras cuatro para ver si los val
 
 * Fuente: tema de variables relacionadas/multicolinealidad en `CD_04_01_RegresionLineal`, pág. 37, y preparación de datos en `CD_01_Introduccion_Gestion_de_Proyectos`, pág. 30. Spearman y AUC de rangos no aparecen como procedimiento obligatorio en esas filminas; son elecciones exploratorias del proyecto.
 
+#### 3.4.3. Relación entre tiempo y etapa
+
+Se usa `tiempo_relativo_segundos`, contado desde el inicio del CSV, para analizar todos los epochs evaluables del ETL cargado. Las cajas muestran cuándo aparecen las etapas; la AUC de rangos global y por paciente describe si una etapa tiende a aparecer antes o después que el resto. AUC cercana a 0,5 no descarta patrones cíclicos. Las proporciones por bloques de 30 minutos se comparan con peso por epoch y con igual peso por paciente observado, junto con la cobertura. Los huecos no se rellenan y los pacientes sin suficientes epochs para una etapa quedan no evaluables. Los controles permanecen dentro del notebook. No se entrenan algoritmos ni se incorpora el tiempo a `X`: su utilidad se evaluará después con pacientes separados.
+
 ### 3.5. Revisión y variantes de características
 
 Se revisa qué características existen, cómo se comportan y qué alternativas podrían probarse después. Las columnas originales permanecen en el dataset base.
