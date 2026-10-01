@@ -9,7 +9,7 @@ El objetivo exclusivo del proyecto es predecir `Sleep_Stage` para cada epoch. La
 
 ## Evidencia y alcance
 
-- En una muestra de 200.000 filas de cada uno de los 12 CSV disponibles localmente, las cuatro columnas de apnea presentaron únicamente `1` o ausencia de evento. Son indicadores de eventos, no magnitudes continuas con valores extremos; por lo tanto, no corresponde aplicarles recorte estadístico ni estimar un máximo distinto de `1`.
+- En una exploración previa de 200.000 filas de cada uno de 12 CSV inspeccionados, las cuatro columnas de apnea presentaron únicamente `1` o ausencia de evento. Esta observación debe contrastarse con la cohorte objetivo. Son indicadores de eventos, no magnitudes continuas con valores extremos; por lo tanto, no corresponde aplicarles recorte estadístico ni estimar un máximo distinto de `1`.
 - Un evento respiratorio puede cruzar límites entre epochs o coincidir parcialmente con un epoch rotulado como vigilia. La presencia de apnea no determina por sí sola una etapa y no se utilizará como regla para descartar REM.
 - Las señales respiratorias originales (`PTAF`, `FLOW`, `THORAX`, `ABDOMEN` y `SNORE`) sí permanecerán como candidatas a predictores porque representan mediciones fisiológicas y no anotaciones clínicas derivadas.
 - Esta decisión se aplica al modelo principal de clasificación de etapas. Podrá evaluarse aparte un modelo experimental que incluya las anotaciones de apnea, identificado explícitamente como un escenario con información clínica privilegiada y no comparable con inferencia wearable o en tiempo real.

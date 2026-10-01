@@ -27,7 +27,7 @@ El *binning* no corrige un error de medición: discretiza valores y pierde resol
 
 ## Pendientes de revisión — no implementados
 
-1. Inspeccionar casos dirigidos en señal cruda: EDA del paciente 4 en los epochs 729–755 y 797, el paciente que concentra TEMP baja y epochs con BVP alto junto con aceleración. Verificar continuidad, escala, contacto, cobertura y cambios de etapa. La muestra exploratoria de 18 pacientes no basta para fijar reglas globales.
+1. Inspeccionar casos dirigidos en señal cruda: EDA del paciente 4 en los epochs 729–755 y 797, el paciente que concentra TEMP baja y epochs con BVP alto junto con aceleración. Verificar continuidad, escala, contacto, cobertura y cambios de etapa. Las inspecciones dirigidas no bastan para fijar reglas globales; contrastarlas con la cohorte objetivo.
 2. Clasificar los patrones observados como extremo plausible, artefacto confirmado, problema de escala o caso no resuelto. Registrar evidencia, pacientes, epochs y efecto potencial sobre cada etapa antes de definir un tratamiento.
 3. Solo después de aprobar una regla concreta, corregir desde la fuente o invalidar la señal afectada cuando corresponda, conservar el dataset original y comparar cobertura, dimensiones y distribución por etapa/paciente antes y después. Repetir la auditoría sobre el conjunto completo antes de generalizar. No se fija aún ningún límite de clipping o binning.
 

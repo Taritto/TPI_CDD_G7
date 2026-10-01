@@ -10,11 +10,11 @@ Resumen para discutir el paso del EDA/ETL al modelado. El detalle metodológico 
 - Se analizaron distribuciones, desbalance de etapas, diferencias entre pacientes, asociaciones descriptivas y redundancia entre señales. N2 representa aproximadamente **51,5 %** de los epochs; N3, **3,8 %**. En los epochs conservados, 38 de 73 pacientes no presentan N3 observado y 12 no presentan REM observado. Esto no implica ausencia fisiológica de esas etapas.
 - Se definieron variantes reversibles de características y una **copia candidata** de modelado: `log1p` para BVP/EDA y el resumen ACC, máximo bilateral de ojos y piernas, y norma de las desviaciones ACC. Las columnas originales permanecen en el ETL base. Los controles de construcción no demuestran que esa copia mejore la clasificación.
 
-**Alcance comprobado:** las salidas guardadas documentan la cohorte de 73 pacientes, pero el CSV cacheado disponible localmente contiene **13.165 epochs de 18 pacientes**. La sección 3.9 no tiene una salida guardada de la ejecución completa. **La versión actual del notebook no contiene un entrenamiento ni una evaluación de algoritmos.**
+**Alcance de los resultados:** las salidas históricas guardadas documentan una cohorte de 73 pacientes. La cantidad de archivos, pacientes y epochs de la ejecución vigente se obtiene de las auditorías y los controles del notebook; el dataset, las auditorías y el manifiesto deben pertenecer a la misma ejecución. La sección 3.9 debe ejecutarse y conservar sus resultados para esa cohorte. **La versión actual del notebook no contiene un entrenamiento ni una evaluación de algoritmos.**
 
 ## Qué falta antes de evaluar modelos
 
-1. Recuperar juntos el CSV completo de 54.367 epochs, el manifiesto y las auditorías; ejecutar de principio a fin los controles de 3.7 y las transformaciones candidatas de 3.5/3.9. Confirmar filas, pacientes, clases, claves y valores finitos sin usar la caché reducida para conclusiones globales.
+1. Recuperar juntos el dataset completo de la cohorte objetivo, el manifiesto y las auditorías; ejecutar de principio a fin los controles de 3.7 y las transformaciones candidatas de 3.5/3.9. Confirmar archivos, pacientes, epochs, clases, claves y valores finitos sobre la misma versión del dataset.
 2. Cerrar o dejar explícitamente marcadas las incidencias pendientes: segmentos excluidos de S027/S048, EDA elevada en S004/S057/S027, temperatura baja y escala/calidad de SAO2 e IBI. No corregir una señal ni eliminar pacientes por un máximo o por la regla IQR sin evidencia localizada.
 3. Acordar el escenario de uso: **PSG + wearable** o **wearable solo**. Son preguntas distintas; las señales PSG pueden no estar disponibles en la aplicación final.
 
