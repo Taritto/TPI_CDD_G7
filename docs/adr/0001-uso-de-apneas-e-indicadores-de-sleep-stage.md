@@ -5,7 +5,7 @@ date: 2026-09-28
 
 # Conservar las apneas como contexto y excluir indicadores derivados del modelo principal
 
-El objetivo exclusivo del proyecto es predecir `Sleep_Stage` para cada epoch. Las anotaciones clínicas `Obstructive_Apnea`, `Central_Apnea`, `Hypopnea` y `Multiple_Events` se conservarán en el dataset consolidado para auditoría, análisis por paciente y estudios posteriores, pero quedarán marcadas como excluidas de los predictores del modelo principal. Esta separación evita confundir anotaciones clínicas posteriores con mediciones disponibles para una predicción nueva, sin perder información potencialmente útil.
+El objetivo exclusivo del proyecto es predecir `Sleep_Stage` para cada epoch. Las anotaciones clínicas `Obstructive_Apnea`, `Central_Apnea`, `Hypopnea` y `Multiple_Events` se conservan en los CSV originales para auditoría, análisis por paciente y estudios posteriores, pero no se incorporan al dataset consolidado ni se usan como predictores del modelo principal. Esta separación evita confundir anotaciones clínicas posteriores con mediciones disponibles para una predicción nueva, sin perder información potencialmente útil.
 
 ## Evidencia y alcance
 
@@ -37,7 +37,7 @@ La familia matemática del algoritmo podrá ser la misma, pero cada alternativa 
 
 ## Consecuencias
 
-- Conservar una columna en el dataset no implica utilizarla como predictor.
+- Conservar una columna en los CSV originales no implica incorporarla al dataset de epochs ni utilizarla como predictor.
 - El futuro diccionario de datos deberá clasificar cada columna por función: identificador, objetivo, predictor, control de calidad o contexto clínico excluido.
 - La selección definitiva de características se realizará sobre los datos de entrenamiento y se validará por paciente.
 - Las medias y medianas de señales oscilatorias quedan como candidatas a revisión, no a eliminación automática; esta decisión se documentará por separado cuando se analice la selección de variables.
