@@ -174,18 +174,30 @@ Spearman es el **coeficiente de correlación** que resume si dos variables tiend
 
 #### 3.4.2. Asociación con cada etapa
 
-La AUC de rangos compara una etapa frente a las otras cuatro para ver si los valores de una señal tienden a ser mayores o menores en esa etapa. Se transforma a una escala donde **0 significa sin separación por rangos**; el signo indica dirección. La tabla informa cuántos epochs y pacientes sostienen cada comparación. No es rendimiento de un modelo fuera de muestra.
+Básicamente, para cada variable se compara un epoch de una etapa con un epoch de cualquiera de las otras cuatro y se observa cuál tiene el valor mayor. Se repite la comparación para muchas parejas de epochs.
 
-En el mapa, **rojo no indica un error**: un valor positivo señala que la característica suele ser mayor en esa etapa que en el resto; uno negativo señala que suele ser menor. Por ejemplo, +0,7 en N3 equivale a una AUC de rangos de 0,85 para esa comparación descriptiva, no a un 70 % de acierto. Como N3 aparece en menos pacientes, esa diferencia debe comprobarse luego con una evaluación separada por paciente.
+Esta comparación se resume con la AUC (área bajo la curva ROC). La curva ROC muestra cómo cambian los aciertos y las falsas alarmas al variar el umbral usado para distinguir esa etapa del resto.
+
+* En el mapa, **rojo no indica un error**
+
+Por ejemplo: en la columna `N3`, `C4-M1_std = +0,78` indica que esa variable suele ser mayor en los epochs N3 que en los epochs de las demás etapas.
 
 * Fuente: tema de variables relacionadas/multicolinealidad en `CD_04_01_RegresionLineal`, pág. 37, y preparación de datos en `CD_01_Introduccion_Gestion_de_Proyectos`, pág. 30. Spearman y AUC de rangos no aparecen como procedimiento obligatorio en esas filminas; son elecciones exploratorias del proyecto.
 
 #### 3.4.3. Relación entre tiempo y etapa
 
-Se estudia **cuándo aparece cada etapa** dentro del registro de cada paciente. El tiempo se cuenta desde el inicio del CSV; las cajas y los bloques de 30 minutos muestran su distribución. No se rellenan huecos ni se usa el tiempo para entrenar un modelo.
+Se hace una comparación parecida a la de 3.4.2, pero ahora el valor comparado es el **tiempo desde el inicio del CSV**, no una señal. Dentro de cada paciente se compara un epoch de una etapa con otro de cualquiera de las demás.
 
-- **Qué significa AUC temporal:** si elegimos un epoch de una etapa y otro de cualquier otra etapa del mismo paciente, la AUC indica la probabilidad de que el primero ocurra más tarde. Con 0,8, ocurriría más tarde en unas 8 de cada 10 comparaciones; con 0,2, suele ocurrir antes. Un valor cercano a 0,5 no muestra una tendencia neta, pero puede haber ciclos. **No es porcentaje de aciertos de un modelo.**
-- **Qué se observó en la corrida completa guardada:** REM tiende a aparecer más tarde en 55 de 64 pacientes evaluables y N3 más temprano en 26 de 27. W, N1 y N2 varían más entre personas. Son tendencias, no un orden obligatorio; un caso contrario, como S096 en N3, no se descarta por ello.
+La AUC temporal indica con qué frecuencia el primero ocurre **después**:
+* `0,8` significa 8 de cada 10 comparaciones
+* `0,2` indica que suele ocurrir **antes**.
+* Cerca de `0,5` no hay una tendencia clara hacia temprano o tarde, aunque puede haber ciclos.
+
+- **Cómo leer el mapa:** cada fila es un paciente y cada columna una etapa frente al resto. Aquí se muestra la AUC original, de 0 a 1: rojo indica aparición más tardía y azul, más temprana. Gris significa que no hay suficientes epochs para evaluar esa etapa; no significa AUC igual a cero.
+
+- **Qué se observó:** REM tiende a aparecer más tarde en 55 de 64 pacientes evaluables y N3 más temprano en 26 de 27. W, N1 y N2 varían más entre personas. S096 es una excepción para N3; una excepción no justifica descartar al paciente.
+
+- **Para qué sirve:** comprueba si la tendencia se repite entre pacientes en lugar de depender solo del resultado global. Las cajas muestran cuándo aparecen las etapas; los bloques de 30 minutos muestran sus proporciones y cuántos datos hay en cada tramo. Los huecos no se rellenan. El tiempo todavía no se usa como predictor ni se ha probado si mejora un modelo para pacientes nuevos.
 
 ### 3.5. Revisión y variantes de características
 
