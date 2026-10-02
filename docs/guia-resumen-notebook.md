@@ -185,7 +185,7 @@ En el mapa, **rojo no indica un error**: un valor positivo señala que la caract
 Se estudia **cuándo aparece cada etapa** dentro del registro de cada paciente. El tiempo se cuenta desde el inicio del CSV; las cajas y los bloques de 30 minutos muestran su distribución. No se rellenan huecos ni se usa el tiempo para entrenar un modelo.
 
 - **Qué significa AUC temporal:** si elegimos un epoch de una etapa y otro de cualquier otra etapa del mismo paciente, la AUC indica la probabilidad de que el primero ocurra más tarde. Con 0,8, ocurriría más tarde en unas 8 de cada 10 comparaciones; con 0,2, suele ocurrir antes. Un valor cercano a 0,5 no muestra una tendencia neta, pero puede haber ciclos. **No es porcentaje de aciertos de un modelo.**
-- **Qué se observó en la captura del equipo:** REM tiende a aparecer más tarde en 55 de 64 pacientes evaluables y N3 más temprano en 26 de 27. W, N1 y N2 varían más entre personas. Son tendencias, no un orden obligatorio; un caso contrario, como S096 en N3, no se descarta por ello.
+- **Qué se observó en la corrida completa guardada:** REM tiende a aparecer más tarde en 55 de 64 pacientes evaluables y N3 más temprano en 26 de 27. W, N1 y N2 varían más entre personas. Son tendencias, no un orden obligatorio; un caso contrario, como S096 en N3, no se descarta por ello.
 
 ### 3.5. Revisión y variantes de características
 
