@@ -12,7 +12,7 @@
 
 **Por qué importa:** antes de analizar hay que definir la pregunta, la unidad de observación y el significado de la etiqueta. Las cinco etapas no deben tratarse como una escala numérica uniforme; REM no es «más profundo» que N3.
 
-**Si preguntan por «ordinal»:** una nota de preprocesamiento usa las etapas de sueño como ejemplo ordinal. Para esta clasificación de cinco clases, el equipo evita imponer un orden único porque R/REM no encaja en una escala simple de profundidad. Es una elección de representación que conviene explicar.
+**Si preguntan por «ordinal»:** La clasificación de cinco clases, el equipo evita imponer un orden único porque R/REM no encaja en una escala de ordenamiento, como si sería por ejemplo: ALTO-MEDIO-BAJO. Elección de representación que conviene explicar.
 
 * Fuente: `CD_01_Aprendizaje Automatico`, págs. 6–10 (aprendizaje supervisado y clasificación). La duración del epoch y las cinco etiquetas provienen del dataset y de la decisión del proyecto, no de esa presentación.
 
@@ -26,7 +26,7 @@ Prepara herramientas de lectura, análisis y gráficos. No es una etapa analíti
 
 ### 1.1. Detección de archivos
 
-Se localizan los CSV disponibles en el entorno y se comprueba cuántos pacientes pueden procesarse. La corrida guardada encontró 77 archivos en Kaggle.
+Se localizan los CSV disponibles en el entorno y se comprueba cuántos pacientes pueden procesarse. La corrida guardada utiliza 77 archivos en Kaggle del dataset `dreamt-data`.
 
 ### 1.2. Paciente muestra
 
@@ -50,29 +50,31 @@ Se comprueban filas, columnas y tipos. Una fila cruda equivale a una medición d
 
 #### 2.2.1. Frecuencia de las etapas
 
-Se cuentan W, N1, N2, N3 y R por paciente y se muestran sus porcentajes. Así vemos si una etapa domina o si alguna no aparece en un registro.
+Se cuentan W, N1, N2, N3 y R en **los tres pacientes de la muestra exploratoria**, por separado y en conjunto, y se muestran sus porcentajes. Así vemos si una etapa domina o si alguna no aparece en uno de esos registros; todavía no describe a los 77 archivos.
 
 #### 2.2.2. Señales frente a `Sleep_Stage`
 
-Se divide el registro en epochs de 30 segundos. Un **epoch puro** tiene una sola etapa válida durante toda la ventana. Se resumen señales como HR o BVP en cada epoch y se comparan con diagramas de caja, separados por paciente y etapa. Esto permite explorar diferencias y solapamientos sin mezclar las escalas de personas distintas. Los puntos extremos pueden ocultarse **en la figura** para leerla mejor; permanecen en los datos.
+Se dividen los registros de **esos mismos tres pacientes** en epochs de 30 segundos. Un **epoch puro** tiene una sola etapa válida durante toda la ventana. Se resumen señales como BVP y TEMP en cada epoch y se comparan con diagramas de caja, separados por paciente y etapa. Esto permite explorar diferencias y solapamientos sin mezclar las escalas de personas distintas. Los puntos extremos pueden ocultarse **en la figura** para leerla mejor; permanecen en los datos.
+
+**Cómo leer la caja:** cada una representa los valores de una señal para una etapa de un paciente. La línea central es la mediana; la caja contiene la mitad central de los epochs y los bigotes muestran valores más alejados, hasta 1,5 veces el rango intercuartílico. Si las cajas de dos etapas están a distinta altura, sus valores centrales difieren; si se superponen mucho, esa señal por sí sola no las distingue claramente. Los puntos fuera de los bigotes son candidatos a revisión, no errores confirmados.
 
 * Fuente: `CD_02_03_Preprocesamiento`, págs. 2–4 y 8–10 (variables categóricas, numéricas y valores irregulares). La elección de cajas por paciente y epochs puros es del proyecto.
 
 ### 2.3. Auditoría de valores nulos
 
-Se auditan faltantes, infinitos y valores no numéricos en las señales de los pacientes exploratorios. El objetivo es saber si las columnas pueden analizarse como mediciones numéricas antes de decidir cualquier limpieza. No se modifican datos.
+Se auditan faltantes, infinitos y valores no numéricos en las señales de los pacientes exploratorios. El objetivo es saber si las columnas pueden analizarse como mediciones numéricas antes de decidir cualquier limpieza. No se modifican datos. Se excluyen las columnas de las apneas, ya que son otras etiquetas que el médico colocó (no es lo que buscamos predecir).
 
 * Fuente: `CD_02_03_Preprocesamiento`, págs. 8–19 y `Class Notes/02 - Preprocesamiento.md` (faltantes e inconsistencias).
 
 #### 2.3.1. Distribución e inspección de extremos
 
-En el paciente muestra se resumen HR, TEMP, EDA (actividad electrodérmica) y SAO2 (saturación de oxígeno en sangre) con percentiles, mínimo y máximo. Luego se grafica cada señal durante los **30 segundos anteriores y posteriores** a su mínimo y a su máximo. Ver el entorno temporal ayuda a distinguir un pico aislado de un cambio sostenido o un posible problema de medición. **Un extremo es un caso para investigar, no una orden de eliminarlo**; esta sección no modifica datos ni describe a toda la cohorte.
+En el paciente muestra se resumen HR (frecuencia cardíaca estimada), TEMP, EDA (actividad electrodérmica) y SAO2 (saturación de oxígeno en sangre) con percentiles, mínimo y máximo. Luego se grafica cada señal durante los **30 segundos anteriores y posteriores** a su mínimo y a su máximo. Ver el entorno temporal ayuda a distinguir un pico aislado de un cambio sostenido o un posible problema de medición. **Un extremo es un caso para investigar, no una orden de eliminarlo**; esta sección no modifica datos ni describe a todos los pacientes.
 
 * Fuente: `CD_02_03_Preprocesamiento`, págs. 8–10 y 21–22 (valores irregulares y limpieza). Los percentiles y la ventana temporal son herramientas elegidas por el equipo.
 
 ### 2.4. Epochs alineados del paciente muestra
 
-Se buscan los cambios de etapa para ubicar dónde empiezan las ventanas completas de 3000 muestras. Puede haber un fragmento inicial o final incompleto. Definir ventanas **antes de filtrar filas** conserva la correspondencia entre señal, tiempo y etiqueta.
+Se buscan los cambios de etapa para ubicar dónde empiezan las ventanas completas de 3000 muestras (en desfasaje propio de los registros de cada paciente). Puede haber un fragmento inicial o final incompleto. Definir correctamente ventanas **antes de filtrar filas** conserva la correspondencia entre señal, tiempo y etiqueta.
 
 * Fuente: tema de integración y transformación en `CD_02_03_Preprocesamiento`, págs. 23–29. La regla de 30 segundos y la inferencia del desplazamiento son específicas del dataset/proyecto; no están explicitadas en las filminas.
 
@@ -90,13 +92,17 @@ Extiende la inspección a todos los CSV disponibles: estructura, lectura, contin
 
 #### 2.6.1. Alineación y etiquetas faltantes
 
-Se identifican cambios que no caben en una sola grilla de 30 segundos y tramos `Missing`. Detectar una inconsistencia no equivale a repararla. S027 y S048 presentan desplazamientos inconsistentes; el ETL conserva solo sus segmentos verificables y deja fuera los tramos ambiguos.
+Se observa en qué fila cambia `Sleep_Stage`: si todos los cambios caen en límites de ventanas de 3000 muestras con el **mismo desplazamiento inicial**, se puede formar una única grilla de epochs de 30 segundos. La auditoría encontró **75 archivos con una alineación candidata consistente** y **dos con desplazamientos inconsistentes**, S027 y S048. «Candidata» significa que este control temporal resulta coherente, no que todas las etiquetas o señales sean perfectas.
+
+En S027 y S048 los cambios siguen más de un desplazamiento, de modo que una sola grilla podría mezclar etapas dentro de un epoch. El ETL busca tramos continuos con alineación verificable y conserva solo esos epochs; deja fuera los tramos ambiguos. También se revisan etiquetas `Missing`. Detectar una inconsistencia no equivale a reparar automáticamente todo el registro.
 
 * Fuente: tema de datos incompletos e inconsistentes en `CD_02_03_Preprocesamiento`, págs. 9–18. Las reglas concretas para pacientes y desplazamientos son decisiones del proyecto.
 
 #### 2.6.2. SAO2
 
-Se revisan rango, ceros y saltos. Un valor fuera de 0–1 solo viola ese rango **si la columna está expresada como fracción**; antes de convertir hay que confirmar la unidad. Por esa incertidumbre, SAO2 permanece fuera de las características actuales.
+Se revisan rango, ceros y saltos. Un valor fuera de 0–1 solo viola ese rango **si la columna está expresada como fracción**; antes de convertir hay que confirmar la unidad. S027, por ejemplo, registra SAO2 casi constante alrededor de 12, distinto de la escala cercana a 0,9 observada en otros pacientes.
+
+**Decisión:** el notebook no convierte ni corrige SAO2, ni excluye a S027 por esta señal. Conserva la columna en los CSV originales y deja SAO2 fuera de las características del ETL actual para **todos** los pacientes. Así se evita incorporar una medición cuya escala y calidad todavía no están confirmadas; revisarla queda pendiente si se quiere usar más adelante.
 
 * Fuente: tema de inconsistencias y validación de variables en `CD_02_03_Preprocesamiento`, págs. 10–16. El rango y la exclusión temporal de SAO2 son decisiones del proyecto.
 
@@ -136,9 +142,13 @@ Concilia cuántos pacientes y epochs entraron, cuáles se descartaron y qué eti
 
 Se compara la frecuencia de las cinco clases y las características resumidas por epoch. En los **76 pacientes incluidos**, N2 fue la etapa más frecuente (51,96 %) y N3 la menos frecuente (3,87 %). Las cajas por etapa muestran cuánto se solapan las señales; no prueban por sí solas que permitan clasificar pacientes nuevos.
 
+**N3 es poco frecuente en los epochs conservados.** La fragmentación del sueño o las condiciones de registro (hospitalización) podrían contribuir, pero este análisis no identifica su causa. Por eso tratamos el 3,87 % como un resultado descriptivo y una clase poco representada, sin atribuirlo a apnea ni al efecto de la primera noche.
+
 #### 3.3.1. Revisión exploratoria de valores atípicos
 
 El criterio global 1,5 × IQR **marca epochs para revisar**, no define límites fisiológicos ni elimina datos. Se observa si los casos se concentran en ciertos pacientes o forman tramos consecutivos; la distancia en IQR sirve para ordenar casos **dentro de una señal**. Las cajas de 3.3 calculan cuartiles por etapa y, por eso, pueden marcar otros puntos.
+
+IQR es el **rango intercuartílico**: la distancia entre los percentiles 25 y 75, donde se concentra la mitad central de los valores. Un epoch que queda a más de 1,5 veces esa distancia por debajo o por encima de ese rango se señala como atípico para investigarlo, no como medición necesariamente errónea.
 
 #### 3.3.2. Distribuciones de predictores prioritarios
 
@@ -147,6 +157,8 @@ Se comparan histogramas y cajas por etapa de resúmenes **por epoch**: medianas 
 #### 3.3.3. EDA en todos los pacientes incluidos
 
 Se comparan mediana y percentiles de EDA por paciente y se observa su evolución temporal en los epochs conservados. Esto ayuda a distinguir un nivel habitualmente alto de episodios localizados; los espacios sin epochs retenidos no prueban que falte EDA cruda. `log1p` facilita **solo la visualización**. S004/S057 requieren contrastar estos resúmenes con sus señales crudas antes de decidir un tratamiento.
+
+«Pendiente de revisión» significa que S004 y S057 están marcados para investigar, no descartados: sus medianas de EDA son bajas (0,322 y 0,244), pero sus percentiles 95 llegan a 45,269 y 6,069. El mapa de evolución muestra, por paciente y por bloques de cinco minutos, la mediana de EDA de los epochs conservados. Permite ubicar cuándo aparecen valores altos; un hueco indica que en ese bloque no hubo epochs conservados para graficar, no necesariamente que faltara la señal original.
 
 * Fuente: `CD_02_03_Preprocesamiento`, págs. 8–10, 17–22 (outliers y limpieza). Mediana, desviación e IQR son herramientas estadísticas aplicadas por el proyecto; el tratamiento específico no está impuesto en las filminas.
 
@@ -158,15 +170,22 @@ Estas asociaciones son descriptivas: no demuestran causalidad, utilidad conjunta
 
 Spearman compara **señales entre sí** para detectar información similar. Una correlación alta sugiere revisar redundancia y cobertura; no obliga a quitar una columna ni indica que esa señal prediga la etapa.
 
+Spearman es el **coeficiente de correlación** que resume si dos variables tienden a subir o bajar juntas: va de −1 a +1, y cerca de 0 indica poca asociación monotónica. El mapa de calor es solo la forma de representar esos coeficientes mediante colores; por ejemplo, C4-M1_std y F4-M1_std alcanzan 0,936 en esta corrida.
+
 #### 3.4.2. Asociación con cada etapa
 
 La AUC de rangos compara una etapa frente a las otras cuatro para ver si los valores de una señal tienden a ser mayores o menores en esa etapa. Se transforma a una escala donde **0 significa sin separación por rangos**; el signo indica dirección. La tabla informa cuántos epochs y pacientes sostienen cada comparación. No es rendimiento de un modelo fuera de muestra.
+
+En el mapa, **rojo no indica un error**: un valor positivo señala que la característica suele ser mayor en esa etapa que en el resto; uno negativo señala que suele ser menor. Por ejemplo, +0,7 en N3 equivale a una AUC de rangos de 0,85 para esa comparación descriptiva, no a un 70 % de acierto. Como N3 aparece en menos pacientes, esa diferencia debe comprobarse luego con una evaluación separada por paciente.
 
 * Fuente: tema de variables relacionadas/multicolinealidad en `CD_04_01_RegresionLineal`, pág. 37, y preparación de datos en `CD_01_Introduccion_Gestion_de_Proyectos`, pág. 30. Spearman y AUC de rangos no aparecen como procedimiento obligatorio en esas filminas; son elecciones exploratorias del proyecto.
 
 #### 3.4.3. Relación entre tiempo y etapa
 
-Se usa `tiempo_relativo_segundos`, contado desde el inicio del CSV, para analizar todos los epochs evaluables del ETL cargado. Las cajas muestran cuándo aparecen las etapas; la AUC de rangos global y por paciente describe si una etapa tiende a aparecer antes o después que el resto. AUC cercana a 0,5 no descarta patrones cíclicos. Las proporciones por bloques de 30 minutos se comparan con peso por epoch y con igual peso por paciente observado, junto con la cobertura. Los huecos no se rellenan y los pacientes sin suficientes epochs para una etapa quedan no evaluables. Los controles permanecen dentro del notebook. No se entrenan algoritmos ni se incorpora el tiempo a `X`: su utilidad se evaluará después con pacientes separados.
+Se estudia **cuándo aparece cada etapa** dentro del registro de cada paciente. El tiempo se cuenta desde el inicio del CSV; las cajas y los bloques de 30 minutos muestran su distribución. No se rellenan huecos ni se usa el tiempo para entrenar un modelo.
+
+- **Qué significa AUC temporal:** si elegimos un epoch de una etapa y otro de cualquier otra etapa del mismo paciente, la AUC indica la probabilidad de que el primero ocurra más tarde. Con 0,8, ocurriría más tarde en unas 8 de cada 10 comparaciones; con 0,2, suele ocurrir antes. Un valor cercano a 0,5 no muestra una tendencia neta, pero puede haber ciclos. **No es porcentaje de aciertos de un modelo.**
+- **Qué se observó en la captura del equipo:** REM tiende a aparecer más tarde en 55 de 64 pacientes evaluables y N3 más temprano en 26 de 27. W, N1 y N2 varían más entre personas. Son tendencias, no un orden obligatorio; un caso contrario, como S096 en N3, no se descarta por ello.
 
 ### 3.5. Revisión y variantes de características
 
@@ -175,6 +194,8 @@ Se revisa qué características existen, cómo se comportan y qué alternativas 
 #### 3.5.1. Ficha de variables y consistencia entre pacientes
 
 Se resumen cobertura, variación y marcas de revisión de cada característica. Después se observa si las diferencias entre etapas mantienen su **dirección** en distintos pacientes, en vez de depender solo de la mezcla global. Es un filtro exploratorio para formular hipótesis, no una selección definitiva.
+
+En esta corrida, la mediana de HR y la variabilidad de BVP son mayores en vigilia que en las otras etapas para aproximadamente el 85 % de los pacientes evaluables; la variabilidad de ACC_X muestra la misma dirección en el 97 %. En cambio, la mediana de EDA no muestra una dirección consistente. Para N3 solo hay 27 pacientes con suficientes epochs para esta comparación, así que sus resultados requieren más cautela. Estas observaciones orientan qué características probar después, pero todavía no demuestran capacidad predictiva en pacientes nuevos.
 
 #### 3.5.2. Variantes reversibles de características
 
