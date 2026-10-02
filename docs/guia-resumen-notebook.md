@@ -142,6 +142,8 @@ Concilia cuántos pacientes y epochs entraron, cuáles se descartaron y qué eti
 
 Se compara la frecuencia de las cinco clases y las características resumidas por epoch. En los **76 pacientes incluidos**, N2 fue la etapa más frecuente (51,96 %) y N3 la menos frecuente (3,87 %). Las cajas por etapa muestran cuánto se solapan las señales; no prueban por sí solas que permitan clasificar pacientes nuevos.
 
+**N3 es poco frecuente en los epochs conservados.** La fragmentación del sueño o las condiciones de registro (hospitalización) podrían contribuir, pero este análisis no identifica su causa. Por eso tratamos el 3,87 % como un resultado descriptivo y una clase poco representada, sin atribuirlo a apnea ni al efecto de la primera noche.
+
 #### 3.3.1. Revisión exploratoria de valores atípicos
 
 El criterio global 1,5 × IQR **marca epochs para revisar**, no define límites fisiológicos ni elimina datos. Se observa si los casos se concentran en ciertos pacientes o forman tramos consecutivos; la distancia en IQR sirve para ordenar casos **dentro de una señal**. Las cajas de 3.3 calculan cuartiles por etapa y, por eso, pueden marcar otros puntos.
@@ -180,7 +182,10 @@ En el mapa, **rojo no indica un error**: un valor positivo señala que la caract
 
 #### 3.4.3. Relación entre tiempo y etapa
 
-Se usa `tiempo_relativo_segundos`, contado desde el inicio del CSV, para analizar todos los epochs evaluables del ETL cargado. Las cajas muestran cuándo aparecen las etapas; la AUC de rangos global y por paciente describe si una etapa tiende a aparecer antes o después que el resto. AUC cercana a 0,5 no descarta patrones cíclicos. Las proporciones por bloques de 30 minutos se comparan con peso por epoch y con igual peso por paciente observado, junto con la cobertura. Los huecos no se rellenan y los pacientes sin suficientes epochs para una etapa quedan no evaluables. Los controles permanecen dentro del notebook. No se entrenan algoritmos ni se incorpora el tiempo a `X`: su utilidad se evaluará después con pacientes separados.
+Se estudia **cuándo aparece cada etapa** dentro del registro de cada paciente. El tiempo se cuenta desde el inicio del CSV; las cajas y los bloques de 30 minutos muestran su distribución. No se rellenan huecos ni se usa el tiempo para entrenar un modelo.
+
+- **Qué significa AUC temporal:** si elegimos un epoch de una etapa y otro de cualquier otra etapa del mismo paciente, la AUC indica la probabilidad de que el primero ocurra más tarde. Con 0,8, ocurriría más tarde en unas 8 de cada 10 comparaciones; con 0,2, suele ocurrir antes. Un valor cercano a 0,5 no muestra una tendencia neta, pero puede haber ciclos. **No es porcentaje de aciertos de un modelo.**
+- **Qué se observó en la captura del equipo:** REM tiende a aparecer más tarde en 55 de 64 pacientes evaluables y N3 más temprano en 26 de 27. W, N1 y N2 varían más entre personas. Son tendencias, no un orden obligatorio; un caso contrario, como S096 en N3, no se descarta por ello.
 
 ### 3.5. Revisión y variantes de características
 
