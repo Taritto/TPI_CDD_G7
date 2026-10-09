@@ -1,21 +1,42 @@
+---
+status: accepted
+date: 2026-09-29
+---
+
 # Revisión y selección de características
 
-**Estado de implementación:** parcial. La sección 3.5.1 del notebook genera una ficha por característica con cobertura, pacientes con valor, variación, asociación descriptiva máxima por etapa y marca para revisar medias/medianas de señales oscilatorias. Todas las decisiones de inclusión en el modelo quedan pendientes. También resume, para variables prioritarias, la dirección de la diferencia de medianas entre una etapa y el resto dentro de cada paciente, exigiendo al menos cinco epochs válidos por grupo; los casos no evaluables permanecen faltantes. Se verificaron sintaxis y lógica con datos sintéticos. Falta ejecutar e interpretar estas tablas con los pacientes definitivos y comparar modelos mediante ablación. No se eligieron ni eliminaron columnas del dataset o del modelo.
+## Implementación vigente
 
-Se conservarán en el dataset base los resúmenes calculados por epoch y los indicadores de calidad. La selección de predictores se hará en una copia para cada experimento. Una media o mediana cercana a cero en una señal oscilatoria puede deberse a compensación de valores positivos y negativos; no convierte en inútil a la señal completa. `HR_mean`, `TEMP_mean` y, sujeto a calidad/disponibilidad, `SAO2_mean` describen un nivel interpretable y no se descartan con ese argumento. Las medias/medianas de señales oscilatorias quedan **marcadas para revisión**, no eliminadas automáticamente.
+Se construyó una copia candidata en 3.9 con 22 predictores, 3 columnas de trazabilidad y 1 objetivo. Se combinan ojos/piernas/ACC y se aplica log1p; el ETL base conserva sus 128 columnas. Selección final y mejora predictiva pendientes de modelado.
 
-## Cómo observar la relación con `Sleep_Stage`
+Fuente: [notebook principal](../../temporal_version_tp_cdd.ipynb).
 
-No generar un gráfico de dispersión por cada columna numérica: el objetivo es categórico y habría demasiados gráficos poco legibles. Usar un conjunto limitado de diagramas de caja/violín o curvas de densidad por etapa para características prioritarias, con cantidad de epochs y pacientes por clase. Para explorar muchas columnas a la vez, usar el mapa de asociación por etapa descrito en la decisión 0006 y una tabla resumida de cobertura, dispersión y posible separación. Graficar en detalle solo las candidatas más prometedoras, las dudosas y las que presenten anomalías. Una diferencia visual es una hipótesis, no una prueba de capacidad predictiva; una superposición tampoco demuestra inutilidad conjunta.
+## Decisión y motivo
 
-## Estabilidad entre pacientes
+Conservar los resúmenes originales y la calidad en el ETL base; elegir una representación inicial en una copia. Medias o medianas próximas a cero en señales oscilatorias no prueban que la señal sea inútil: puede haber compensación de valores positivos y negativos.
 
-Primero observar el comportamiento global; luego, **solo para variables candidatas a una decisión relevante**, comparar el patrón entre pacientes sin producir un gráfico completo por cada persona. Usar un resumen compacto paciente × etapa (por ejemplo, medianas o diferencias entre etapas, junto con número de epochs) para distinguir un patrón reproducible de uno dominado por pocos pacientes. Si una etapa está ausente o tiene muy pocos epochs en un paciente, marcarla como no evaluable para esa comparación, no como cero. Revisar también cobertura y calidad por paciente.
+La copia busca comprimir colas derechas y resumir canales relacionados. Combinar canales puede perder información de lado o eje; cambiar la escala no corrige fallos instrumentales. Las fórmulas y alternativas se detallan debajo para compararlas con los resúmenes originales.
 
-## Utilidad incremental en el modelo
+## Transformaciones y alternativas
 
-Comparar un modelo de referencia con versiones que agreguen o retiren características o familias de señales (ablación), manteniendo la misma partición por paciente y el mismo procedimiento de entrenamiento. Imputación, escalado, selección y cualquier transformación basada en datos se ajustarán solo con pacientes de entrenamiento; usar validación por paciente para decidir y dejar una prueba final separada. Observar métricas por clase —en especial las minoritarias— y no solo exactitud global. Una diferencia pequeña o inestable entre particiones no justifica una poda concluyente. Correlación alta o asociación univariada con una etapa no garantizan aporte incremental.
+| Entradas | Columna candidata | Motivo y límite |
+| --- | --- | --- |
+| `BVP_std` | `BVP_std_log1p` | Comprimir valores altos sin recortarlos; comparar contra la escala original. |
+| `EDA_median` | `EDA_median_log1p` | Reducir la dominancia visual y numérica de la cola derecha; no resolver incertidumbre instrumental. |
+| `ACC_X_std`, `ACC_Y_std`, `ACC_Z_std` | `ACC_axes_std_norm_log1p` | `log1p(sqrt(ACC_X_std² + ACC_Y_std² + ACC_Z_std²))`; combinar dispersión, perdiendo información específica por eje. No es la std de la magnitud de ACC cruda. |
+| `E1_std`, `E2_std` | `EOG_max_std` | Conservar la mayor dispersión ocular; perder lateralidad. |
+| `LAT_std`, `RAT_std` | `LEG_max_std` | Conservar la mayor dispersión de piernas; perder lateralidad. |
 
-## Regla de decisión
+La implementación exige entradas finitas y no negativas para estas transformaciones. `log1p` es una fórmula fija; no aprende parámetros de la cohorte. Escalado, selección u otras transformaciones que sí aprendan parámetros deben ajustarse solo en entrenamiento.
 
-Para cada columna candidata, registrar significado físico, unidad, cobertura/calidad, variación, patrón global y entre pacientes, redundancia y resultado de la comparación de modelos. Clasificarla como **conservar**, **revisar** o **excluir del conjunto de predictores** con motivo explícito. No eliminarla del dataset base por comodidad ni para alcanzar un número arbitrario de columnas. El requisito de dimensiones del dataset entregable se verificará por separado del número de predictores del modelo.
+Alternativas previstas: características originales, transformaciones por separado y variante combinada. Los canales EEG `C4-M1_std`, `F4-M1_std`, `O2-M1_std`, `Fp1-O2_std`, `T3 - CZ_std` y `CZ - T4_std` permanecen: su correlación no demuestra que puedan retirarse sin afectar el modelo.
+
+## Validación pendiente
+
+Cobertura, variación y asociación descriptiva orientan candidatos. Su aporte se comprueba mediante modelos y ablaciones, con preprocesamiento ajustado solo en entrenamiento. No seleccionar por un número arbitrario de predictores ni borrar alternativas del ETL base.
+
+## Criterio para decidir después
+
+En 3.5.1 se contrastan, por paciente, medianas de una etapa frente al resto para `HR_median`, `TEMP_median`, `EDA_median`, `BVP_std`, `ACC_X_std`, `C4-M1_std`, `E1_std` y `FLOW_std`. Se requieren al menos cinco epochs válidos en cada grupo; casos sin cobertura suficiente no se convierten en cero.
+
+Antes de retirar o conservar definitivamente una característica, registrar significado, unidad, calidad/cobertura, patrón entre pacientes, redundancia y resultado de ablación (modelo con y sin ella). Mantener iguales las particiones y observar métricas por clase. Una superposición visual, un coeficiente alto o pasar los controles de construcción no sustituye esa comparación.

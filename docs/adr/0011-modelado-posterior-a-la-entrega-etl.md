@@ -1,17 +1,28 @@
+---
+status: accepted
+date: 2026-09-29
+---
+
 # Modelado posterior a la entrega de ETL
 
-**Estado de implementación:** diferido. El cierre de la sección ETL del notebook explicita que todavía no se entrenó ni evaluó ningún algoritmo. En la entrega actual se documentan los pasos de modelado, pero no se aplicarán salvo que, una vez completado y verificado el ETL, el equipo decida ampliar el alcance. No presentar resultados de modelos como si ya existieran.
+## Implementación vigente
 
-El objetivo futuro será predecir `Sleep_Stage` (W, N1, N2, N3, R). REM no se tratará como un escalón en una escala simple de profundidad; por ello, la regresión logística inicial será **multiclase**, no ordinal. No se presupone que sea el peor modelo: se usa como referencia interpretable.
+La entrega 2 comprende preparación, análisis y copia candidata. La sección 4 plantea modelos y evaluación para continuar; no hay entrenamiento ni métricas predictivas en el notebook actual. La consigna disponible incluye modelado, evaluación e interpretación en la entrega 3.
 
-## Comparación futura propuesta
+Fuente: [notebook principal](../../temporal_version_tp_cdd.ipynb).
 
-1. Referencia trivial que predice la clase mayoritaria, para establecer un mínimo verificable.
-2. Regresión logística multiclase regularizada como modelo base.
-3. Random Forest como primera alternativa no lineal. Considerar gradient boosting solo si aporta a una pregunta o mejora verificable y hay tiempo para evaluarlo correctamente.
+## Decisión y motivo
 
-Comparar los mismos conjuntos de predictores definidos previamente (PSG + wearable y solo wearable) con particiones por `patient_id`, sin compartir pacientes entre entrenamiento, validación y prueba. La imputación, el escalado, la selección, los eventuales límites estadísticos y cualquier ponderación/remuestreo se ajustarán solo dentro de entrenamiento. Evaluar con matriz de confusión, métricas por etapa y F1 macro, prestando atención a clases minoritarias; no elegir un ganador solo por exactitud global. Verificar cobertura de etapas en las particiones y mantener la prueba final sin ajustes guiados por sus resultados. Ningún modelo o técnica de balanceo queda aprobado como ganador antes de medirlo.
+Cerrar la preparación antes de atribuir resultados a modelos. Los mapas descriptivos y controles de integridad no demuestran precisión predictiva. La sección 4 presenta propuestas, no entrenamientos ejecutados.
 
-## Alcance de la entrega ETL
+La tarea futura es clasificación multiclase, no ordinal. Comparar referencia trivial, regresión logística multiclase y un modelo de árboles con particiones por paciente. Escalado, selección y posibles pesos se ajustan dentro de entrenamiento; validación orienta decisiones y la prueba final se reserva.
 
-La prioridad actual es un dataset de epochs reproducible y auditable: fuentes y unidades, alineación a 30 segundos, integración de pacientes, etiquetas, calidad/cobertura, controles de anomalías, EDA justificable y dataset final con dimensiones verificadas. El informe puede cerrar con la pregunta predictiva, los conjuntos de señales previstos, la prevención de fuga entre pacientes, métricas y algoritmos candidatos como **pasos siguientes**, claramente separados de lo implementado. No desviar esfuerzo del ETL hacia entrenamiento prematuro mientras falte validar extracción, transformación y carga.
+## Alternativas y criterio de comparación
+
+El clasificador trivial permite saber qué se logra sin distinguir etapas; regresión logística multiclase ofrece una referencia inicial y un modelo de árboles permite contrastar relaciones no lineales. Son candidatos, no ganadores aprobados ni requisitos específicos de la cátedra.
+
+Comparar escenarios y representaciones con las mismas particiones por paciente. La validación orienta modelos, parámetros y características; reservar la prueba para la evaluación final acordada. Informar F1 macro, matriz de confusión, precisión/recuperación por etapa y variación entre pacientes. La elección debe considerar desempeño y disponibilidad real de señales, especialmente si se propone usar solo wearable.
+
+## Alcance
+
+La consigna disponible ubica selección de técnicas, parámetros, evaluación e interpretación en la tercera entrega. El detalle operativo está en [entrega 3](../entrega-03/README.md); ningún algoritmo queda elegido como ganador antes de medirlo.

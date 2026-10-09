@@ -5,42 +5,27 @@ date: 2026-09-28
 
 # Conservar las apneas como contexto y excluir indicadores derivados del modelo principal
 
-El objetivo exclusivo del proyecto es predecir `Sleep_Stage` para cada epoch. Las anotaciones clínicas `Obstructive_Apnea`, `Central_Apnea`, `Hypopnea` y `Multiple_Events` se conservan en los CSV originales para auditoría, análisis por paciente y estudios posteriores, pero no se incorporan al dataset consolidado ni se usan como predictores del modelo principal. Esta separación evita confundir anotaciones clínicas posteriores con mediciones disponibles para una predicción nueva, sin perder información potencialmente útil.
+## Implementación vigente
 
-## Evidencia y alcance
+Las anotaciones de apnea y los indicadores derivados de Sleep_Stage quedan fuera de los predictores candidatos. SAO2 e IBI tampoco integran el ETL de señales actual. El escenario candidato es PSG + wearable; su disponibilidad en uso real debe discutirse antes de modelar.
 
-- En una exploración previa de 200.000 filas de cada uno de 12 CSV inspeccionados, las cuatro columnas de apnea presentaron únicamente `1` o ausencia de evento. Esta observación debe contrastarse con la cohorte objetivo. Son indicadores de eventos, no magnitudes continuas con valores extremos; por lo tanto, no corresponde aplicarles recorte estadístico ni estimar un máximo distinto de `1`.
-- Un evento respiratorio puede cruzar límites entre epochs o coincidir parcialmente con un epoch rotulado como vigilia. La presencia de apnea no determina por sí sola una etapa y no se utilizará como regla para descartar REM.
-- Las señales respiratorias originales (`PTAF`, `FLOW`, `THORAX`, `ABDOMEN` y `SNORE`) sí permanecerán como candidatas a predictores porque representan mediciones fisiológicas y no anotaciones clínicas derivadas.
-- Esta decisión se aplica al modelo principal de clasificación de etapas. Podrá evaluarse aparte un modelo experimental que incluya las anotaciones de apnea, identificado explícitamente como un escenario con información clínica privilegiada y no comparable con inferencia wearable o en tiempo real.
+Fuente: [notebook principal](../../temporal_version_tp_cdd.ipynb).
 
-## Indicadores derivados de `Sleep_Stage`
+## Decisión y motivo
 
-Los porcentajes por etapa, tiempo total dormido, latencia hasta REM, eficiencia del sueño, tiempo despierto, cantidad de transiciones y duración de episodios se calcularán únicamente después de disponer de una secuencia real o predicha de `Sleep_Stage`. No entrarán como predictores porque contienen información derivada del mismo objetivo y producirían fuga de información.
+Las anotaciones `Obstructive_Apnea`, `Central_Apnea`, `Hypopnea` y `Multiple_Events` se conservan en los CSV originales como contexto, pero no se incorporan al ETL de señales ni al candidato principal. Son anotaciones clínicas, con distinta disponibilidad que una medición nueva. Las señales respiratorias originales sí pueden ser entradas.
 
-Estos indicadores se utilizarán para:
+Indicadores calculados a partir de `Sleep_Stage` (proporciones, latencias y transiciones) sirven para describir el registro, no para predecir esa misma etiqueta: incorporarlos produciría fuga de información. Comparar PSG + wearable y wearable solo requiere conjuntos de entrada y modelos propios, con las mismas particiones por paciente.
 
-- describir la arquitectura del sueño de cada paciente;
-- comparar secuencias reales y predichas a nivel de noche;
-- evaluar si el modelo conserva proporciones, latencias y transiciones razonables;
-- analizar el rendimiento en subgrupos, por ejemplo pacientes con distinta carga de apnea;
-- detectar registros atípicos que necesiten inspección, sin eliminarlos automáticamente.
+## Variables incluidas y excluidas
 
-## Conjuntos de predictores previstos
+`Sleep_Stage` es el objetivo; `patient_id` y `epoch` identifican observaciones y no entran en `X`. `tiempo_relativo_segundos` se conserva para trazabilidad; la candidata actual no lo usa como predictor, aunque se propone comparar un modelo con tiempo en la entrega 3.
 
-Se entrenarán y compararán dos modelos independientes con la misma partición por paciente y las mismas métricas:
-
-1. **PSG + wearable:** utilizará características derivadas de señales clínicas y del dispositivo wearable.
-2. **Wearable-only:** utilizará únicamente características disponibles en el dispositivo wearable.
-
-La familia matemática del algoritmo podrá ser la misma, pero cada alternativa tendrá su propio vector de entrada, escalado, regularización y parámetros aprendidos. No se entrenará un modelo completo para luego retirar columnas durante la inferencia.
+La exclusión de anotaciones de apnea no elimina las señales medidas `SNORE`, `PTAF`, `FLOW`, `THORAX` y `ABDOMEN`: sus desviaciones estándar sí integran la candidata. `SAO2` e `IBI` permanecen en los CSV fuente, pero no en el ETL actual; reconsiderarlas exige revisar escala/calidad y reconstruir sus características con trazabilidad.
 
 ## Consecuencias
 
-- Conservar una columna en los CSV originales no implica incorporarla al dataset de epochs ni utilizarla como predictor.
-- El futuro diccionario de datos deberá clasificar cada columna por función: identificador, objetivo, predictor, control de calidad o contexto clínico excluido.
-- La selección definitiva de características se realizará sobre los datos de entrenamiento y se validará por paciente.
-- Las medias y medianas de señales oscilatorias quedan como candidatas a revisión, no a eliminación automática; esta decisión se documentará por separado cuando se analice la selección de variables.
+Conservar información en el archivo fuente no implica usarla como predictor. La selección final debe considerar calidad, disponibilidad y resultados de validación. Cualquier escenario con anotaciones clínicas adicionales debe identificarse explícitamente.
 
 ## Fuentes
 

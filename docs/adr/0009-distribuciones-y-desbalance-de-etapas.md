@@ -1,33 +1,28 @@
+---
+status: accepted
+date: 2026-09-29
+---
+
 # Distribuciones de predictores y desbalance de etapas
 
-**Estado de implementación:** análisis descriptivo ejecutado sobre 54.367 epochs de 73 pacientes; tratamiento del desbalance pendiente de modelado. La sección 3.3 del notebook muestra el recuento de clases y compara HR, TEMP y EDA mediante la mediana de muestras de cada epoch, y BVP mediante su desviación estándar. Las cajas muestran los atípicos; 3.3.1 cuantifica candidatos y extremos, y 3.3.2 conserva histogramas globales y una vista de cajas sin puntos extremos para leer el centro. Se informa cobertura y número de pacientes por etapa. Las proporciones de clases por paciente están en 3.6. La comparación de 3.5.1 entre pacientes se alineó a `HR_median`, `TEMP_median` y `EDA_median`, pero esa celda debe reejecutarse para actualizar sus salidas. Falta confirmar unidades en fuentes. No se normalizó ningún predictor ni `Sleep_Stage`, y no se aplicó remuestreo, binning o ponderación de clases. Quedan para modelado los conteos por partición, métricas por clase y experimentos de balanceo ajustados solo en entrenamiento.
+## Implementación vigente
 
-**Ampliación de EDA 2.2:** se añadieron cuatro gráficos de barras con proporciones de las cinco etapas válidas: uno por cada paciente de la muestra exploratoria y otro con los tres registros reunidos. El denominador son las muestras con etapa válida; nulos e inválidos siguen visibles en la tabla de control. Esta visualización describe desbalance, no una distribución normal, uniforme o exponencial. Código con sintaxis verificada; falta ejecutar e interpretar los gráficos con los CSV del entorno del estudiante.
+Análisis descriptivo ejecutado en 3.3. El ETL mantiene las frecuencias observadas, sin balanceo. Los recuentos y la cobertura vigentes se consultan en [entrega 2](../entrega-02/README.md); posibles pesos de clase se compararán solo en entrenamiento.
 
-La distribución de una variable predictora y la frecuencia de las clases de `Sleep_Stage` son problemas distintos. La regresión logística no exige que los predictores tengan distribución normal. Una asimetría o una cola larga justifica revisar calidad, extremos o la conveniencia de una transformación; no obliga a recortar ni a «normalizar» la variable para volverla gaussiana. `Sleep_Stage` es categórica: no se normaliza como una variable numérica ni se fuerza a una distribución normal. Si N3 u otra etapa es poco frecuente, el problema es **desbalance de clases** y debe abordarse en entrenamiento y evaluación.
+Fuente: [notebook principal](../../temporal_version_tp_cdd.ipynb).
 
-## Gráficos de distribución a implementar
+## Decisión y motivo
 
-Priorizar predictores con interpretación y potencial de aporte: resúmenes de HR, TEMP, EDA, BVP, aceleración, SAO2 si su calidad lo permite, y resúmenes PSG candidatos. Agregar variables marcadas por faltantes, extremos o mapas de asociación. Para cada candidata, usar una distribución global para conocer escala, ceros, colas y posibles valores inválidos, y una comparación por `Sleep_Stage` para observar superposición o diferencias. Mostrar unidades, cantidad de epochs y pacientes por clase, y cobertura de la señal. No producir gráficos de todas las columnas sin una pregunta exploratoria concreta; reservar inspecciones temporales o por paciente para patrones dudosos.
+Preservar frecuencias originales de `Sleep_Stage` en el ETL. La distribución de predictores y el desbalance de clases son problemas distintos: una cola larga no obliga a recortar, y una etiqueta categórica no se normaliza para volverla gaussiana.
 
-La unidad de observación para comparar con `Sleep_Stage` es el epoch de 30 segundos, no cada muestra cruda con la misma etiqueta repetida. La mediana por epoch de HR, TEMP y EDA es menos sensible a picos aislados que la media, aunque oculta extremos breves. Para BVP, señal oscilatoria, la desviación estándar informa amplitud/dispersión y evita interpretar una media cercana a cero por compensación de fases. Los outliers dibujados corresponden a **características de epochs**, no a picos individuales de la señal cruda. Si la pregunta pasa a ser detectar esos picos, incorporar una inspección cruda dirigida o percentiles/extremos intra-epoch documentados, sin reemplazar automáticamente las características actuales.
+La exactitud global puede favorecer a la clase mayoritaria. Por eso el modelado debe informar métricas por etapa y F1 macro, junto con matriz de confusión. Las cifras de la ejecución de referencia están en [entrega 2](../entrega-02/README.md).
 
-## Desbalance del objetivo
+## Alternativas futuras
 
-En la ejecución informada de 54.367 epochs, las frecuencias son N2: 28.020 (51,5 %), W: 12.047 (22,2 %), N1: 6.389 (11,8 %), R: 5.852 (10,8 %) y N3: 2.059 (3,8 %). N3 aparece en 35 pacientes y R en 61. Son recuentos de epochs, no de observaciones independientes: ventanas contiguas del mismo paciente están relacionadas. Un modelo que favorezca N2 puede lograr una exactitud global aceptable y aun así fallar en N3 o R.
+Comparar primero una referencia sin balanceo y luego posibles pesos de clase solo en entrenamiento. Remuestreo requiere justificación: repetir epochs no genera pacientes nuevos; submuestrear pierde información. Mantener las proporciones originales de validación y prueba y revisar el intercambio entre recuperación y falsos positivos.
 
-Aquí «normalizar el desbalance» significa **equilibrar la influencia de las clases en el entrenamiento**. No significa escalar predictores, transformar `Sleep_Stage` en una variable continua ni fabricar una distribución normal. Tampoco exige que el CSV base tenga 20 % de cada etapa: las frecuencias observadas deben preservarse para describir el estudio y evaluar el desempeño en condiciones realistas.
+## Evaluación y alternativas de balanceo
 
-| Estrategia futura | Efecto buscado | Riesgo principal |
-| --- | --- | --- |
-| Ponderar clases en la función de pérdida | Dar más importancia a errores en N3/R sin cambiar la cantidad de epochs. | Puede elevar su recuperación a costa de más falsos positivos, menor precisión y probabilidades menos calibradas respecto de la frecuencia real. |
-| Sobremuestrear clases minoritarias solo en entrenamiento | Exponer al algoritmo más veces a N3/R. | Repetir epochs vecinos no crea pacientes ni información nueva; aumenta sobreajuste. Ejemplos sintéticos que mezclen pacientes o tiempos podrían ser inverosímiles. |
-| Submuestrear N2 solo en entrenamiento | Reducir su dominio en la optimización. | Pierde variabilidad e información útil de la clase mayoritaria. |
+F1 macro promedia el F1 de cada etapa con el mismo peso. Complementarlo con precisión, recuperación y matriz de confusión: una mejora en recuperación de N3 puede venir acompañada de más falsos positivos.
 
-**Plan de evaluación:** primero conservar una línea base sin balanceo. Separar pacientes entre entrenamiento, validación y prueba, comprobar presencia y cantidad de cada etapa en cada partición y calcular cualquier peso o remuestreo **solo con entrenamiento**. Mantener las proporciones originales en validación/prueba. Comparar matriz de confusión, precisión, recuperación y F1 por etapa, F1 macro y exactitud balanceada; observar explícitamente el intercambio entre recuperación y falsos positivos de N3/R. Si se interpretan probabilidades, revisar su calibración en datos no balanceados. Elegir una estrategia únicamente si mejora la evaluación por paciente, no porque la tabla de frecuencias sea desigual.
-
-**Decisión y estado:** se documenta el desbalance, pero no se corrige en el ETL ni se implementan pesos o remuestreo en esta entrega. La primera alternativa a probar en modelado será ponderación de clases frente a la línea base; su adopción final queda pendiente de resultados.
-
-## Transformaciones
-
-Escalado de predictores, transformaciones para asimetría y tratamiento de extremos son decisiones separadas del desbalance de `Sleep_Stage`. Si se usan, ajustar sus parámetros únicamente con pacientes de entrenamiento y aplicar luego a validación/prueba sin volver a calcularlos. Conservar los valores originales en el dataset base y documentar cada transformación experimental.
+Ponderar clases cambia el costo de sus errores, no sus etiquetas; sobremuestrear repite ejemplos y submuestrear retira parte del entrenamiento. Ninguna opción se aplica al ETL base ni queda elegida por el desbalance solo. Definir particiones por paciente antes de calcular pesos o remuestrear y contrastar cada alternativa contra la referencia sin balanceo.

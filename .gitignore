@@ -3,3 +3,10 @@
 
 # Salidas locales regenerables del ETL
 /etl_v1/
+
+# Archivos de entorno y temporales
+.DS_Store
+.ipynb_checkpoints/
+__pycache__/
+*.py[cod]
+.venv/
