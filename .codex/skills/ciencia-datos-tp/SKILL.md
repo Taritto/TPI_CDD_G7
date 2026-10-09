@@ -1,6 +1,6 @@
 ---
 name: ciencia-datos-tp
-description: "Acompaña el trabajo práctico integral de Ciencia de Datos desde la comprensión del problema y el ETL hasta el modelado, la interpretación y la presentación. Úsala al trabajar en este TP, especialmente para analizar datos y preparar notebooks de Kaggle con guía breve y alineada a la cátedra."
+description: "Acompaña el trabajo práctico integral de Ciencia de Datos desde la comprensión del problema y el ETL hasta el modelado, la interpretación y la presentación. Úsala al trabajar en este TP: analizar datos, preparar notebooks y mantener documentación por entrega y ADR claros, coherentes y sin duplicación."
 ---
 
 # Acompañamiento del TP de Ciencia de Datos
@@ -42,7 +42,21 @@ Si falta una entrada imprescindible, pídela. No inventes el objetivo, el domini
 
 9. **Acompaña las entregas siguientes.** Después del dataset objetivo, ayuda a conectar el problema y el análisis con la elección justificada de clasificación, regresión, agrupamiento u otra técnica que corresponda. Explica parámetros, evaluación, limitaciones e interpretación con apoyo del material. Para la presentación, ayuda a convertir evidencia y resultados en una historia clara; no afirmes causalidad ni generalización que el análisis no sostenga.
 
-10. **Cierra con continuidad.** Al terminar una sesión sustantiva, ofrece un resumen breve y copiable con objetivo, etapa, fuentes, decisiones aprobadas, preguntas abiertas y próximo paso. No lo guardes ni edites archivos por cuenta propia.
+10. **Cierra con continuidad.** Al terminar una sesión sustantiva, ofrece un resumen breve y copiable con objetivo, etapa, fuentes, decisiones aprobadas, preguntas abiertas y próximo paso. Si hubo cambios relevantes autorizados, actualiza la documentación local afectada según la sección siguiente; no crees una bitácora paralela.
+
+## Mantenimiento de documentación
+
+Aplicar al trabajar en este repositorio. Leer `docs/README.md`, el README de la entrega afectada y los ADR pertinentes; no cargar toda la documentación sin necesidad.
+
+- **Cuándo actualizar:** al cambiar código, reglas, estructura del notebook, resultados comprobados o una decisión aprobada. Actualizar únicamente los documentos afectados como parte de ese trabajo. Una consulta sin cambios no obliga a editar; no tocar documentación vigente solo para registrar actividad.
+- **Dónde:** resultados, informe y guía en `docs/entrega-NN/`; contexto y fuentes comunes en `docs/transversal/`; decisiones en `docs/adr/`. Crear otra carpeta de entrega cuando se trabaje en ella y enlazarla desde el índice. Guardar sus figuras/materiales allí, sin nuevas clasificaciones globales ni documentos vacíos.
+- **Una fuente por dato:** código y salidas ejecutadas en el notebook; cifras de referencia en la entrega; reglas y motivos en los ADR. Enlazar en vez de repetir. No fijar resultados de una cohorte como requisitos para futuras ejecuciones.
+- **ADR útiles:** conservar decisión, motivo, variables o fórmulas esenciales, condiciones, alternativas relevantes, consecuencias y estado de implementación. Mantener `status` y `date`; la fecha registra la decisión y no cambia con cada edición. `accepted` no significa que un modelo o transformación haya demostrado superioridad. Recuperar fechas faltantes de evidencia o Git, indicando su procedencia; no inventarlas.
+- **Objetividad:** separar implementado, ejecutado, propuesta y pendiente. Contrastar afirmaciones con el notebook y sus salidas; si no se ejecutó, decirlo. No convertir marcas de revisión en errores confirmados ni asociaciones en rendimiento predictivo. Retirar afirmaciones obsoletas, conservando razones y detalles necesarios para entender la decisión.
+- **Trabajo en equipo:** revisar cambios existentes antes de editar; preservar trabajo ajeno y modificar solo lo necesario. No reemplazar un documento completo si bastan cambios puntuales. Ante decisiones contradictorias sin evidencia para resolverlas, consultar al usuario antes de adoptar una regla nueva.
+- **Historia y cierre:** usar Git para versiones anteriores; no crear changelogs, copias históricas o resúmenes paralelos. Verificar enlaces locales, nombres de variables y referencias de sección afectados. Informar brevemente qué documentación cambió y qué no pudo comprobarse. No hacer commit/push salvo autorización.
+
+Estas reglas autorizan mantenimiento local relacionado con el trabajo solicitado, no cambios de datos ni decisiones metodológicas adicionales. Las instrucciones explícitas del usuario prevalecen.
 
 ## Salida
 
@@ -59,7 +73,7 @@ Adapta la respuesta a lo pedido. Cuando corresponda, incluye:
 
 - El usuario es principiante y debe entender el trabajo; no ocultes decisiones detrás de código ni uses jerga sin explicar.
 - No asumas acceso directo a Kaggle, permisos sobre el dataset del equipo, ni ejecución del notebook. Trabaja con los archivos, datos o salidas que el usuario proporcione y aclara las limitaciones del entorno.
-- No modifiques notebooks, archivos, datasets ni recursos compartidos, ni escribas la bitácora, salvo pedido explícito del usuario. Si pide una propuesta, entrega el contenido para revisar o copiar.
+- La actualización de documentación local afectada por trabajo autorizado está permitida según estas reglas. Esto no autoriza alterar datos, notebooks, recursos externos ni hacer commit o push por iniciativa propia. Si el usuario pide solo explicar, revisar sin modificar o preparar una propuesta, respeta ese alcance.
 - No impongas imputación, eliminación, normalización, reducción, métrica o algoritmo por defecto. La pertinencia depende del dominio, el grano, el objetivo y la teoría aplicable.
 - No incluyas seguimiento de fechas ni cronogramas salvo que el usuario pida ayuda con ellos.
 - No afirmes que una celda se ejecutó, una gráfica se generó o un dataset se guardó si no ocurrió efectivamente.
@@ -68,7 +82,7 @@ Adapta la respuesta a lo pedido. Cuando corresponda, incluye:
 
 Usa estos materiales como corpus de la cátedra. Lee el archivo relevante para la etapa; no es necesario cargar todos los recursos en cada consulta.
 
-- `Trabajo Práctico 2026.pdf`: objetivo, entregas, proceso esperado y evaluación. Es la referencia principal para requisitos explícitos del TP.
+- `docs/transversal/Trabajo Práctico 2026.pdf`: objetivo, entregas, proceso esperado y evaluación. Es la referencia principal para requisitos explícitos del TP.
 - `CD_00_Bienvenida.pdf`: propósito de la materia y ciclo general de Ciencia de Datos.
 - `CD_01_Introduccion_Gestion_de_Proyectos.pdf`: gestión de proyectos de Ciencia de Datos, CRISP-DM, Data Driven Scrum y herramientas.
 - `CD_01_Aprendizaje Automatico.pdf`: tipos de aprendizaje y conceptos introductorios de modelos.
