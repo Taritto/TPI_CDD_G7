@@ -6,6 +6,7 @@ Objetivo: clasificar etapas del sueño W, N1, N2, N3 y REM mediante señales de 
 
 - [DREAMT en PhysioNet](https://www.physionet.org/content/dreamt/2.2.0/): descripción y acceso al dataset. El enlace no confirma por sí solo la versión de los CSV de Kaggle.
 - [CSV utilizados en Kaggle](https://www.kaggle.com/datasets/diegopetitto/dreamt-data).
+- [Notebook utilizado en Kaggle](https://www.kaggle.com/code/lautarocastillo/tpi-cdd-g7).
 - [Consigna del trabajo práctico](<Trabajo Práctico 2026.pdf>): alcance de las cuatro entregas. El año del nombre del archivo fue actualizado por el equipo; el texto del PDF no indica año.
 
 ## Trabajo en equipo
