@@ -81,4 +81,4 @@ El desbalance puede favorecer etapas frecuentes y dificultar el reconocimiento d
 
 ## Propuesta futura condicionada a resultados
 
-Si T6 muestra errores persistentes que justifiquen revisar la representación, comparar una ampliación acotada de características wearable (cambios dentro del epoch o componentes de frecuencia). No es una tarea obligatoria de esta primera comparación ni un defecto confirmado. Requiere revisar señales crudas y sus frecuencias originales/remuestreo, conservar el ETL base y decidir solo con entrenamiento/validación; véase [ADR 0007](../adr/0007-revision-y-seleccion-de-caracteristicas.md).
+Si la validación indica que los resúmenes wearable limitan el modelo, comparar primero más características ya disponibles en el ETL (medias, medianas y desviaciones estándar). Si no basta, considerar una ampliación acotada desde señales crudas, como cambios internos o características de frecuencia. Es una opción futura, no un error confirmado ni una tarea inicial; conservar el ETL base y evaluar sin consultar la prueba final. Véase [ADR 0007](../adr/0007-revision-y-seleccion-de-caracteristicas.md).
