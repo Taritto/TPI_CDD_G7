@@ -7,7 +7,7 @@ date: 2026-09-28
 
 ## Implementación vigente
 
-Las anotaciones de apnea y los indicadores derivados de Sleep_Stage quedan fuera de los predictores candidatos. SAO2 e IBI tampoco integran el ETL de señales actual. El escenario candidato es PSG + wearable; su disponibilidad en uso real debe discutirse antes de modelar.
+Las anotaciones de apnea y los indicadores derivados de Sleep_Stage quedan fuera de los predictores candidatos. SAO2 e IBI tampoco integran el ETL de señales actual. La copia candidata ya construida es PSG + wearable. Para la entrega 3 se acordó wearable como escenario principal y PSG + wearable como comparación secundaria; los modelos todavía no están entrenados.
 
 Fuente: [notebook principal](../../temporal_version_tp_cdd.ipynb).
 
@@ -16,6 +16,10 @@ Fuente: [notebook principal](../../temporal_version_tp_cdd.ipynb).
 Las anotaciones `Obstructive_Apnea`, `Central_Apnea`, `Hypopnea` y `Multiple_Events` se conservan en los CSV originales como contexto, pero no se incorporan al ETL de señales ni al candidato principal. Son anotaciones clínicas, con distinta disponibilidad que una medición nueva. Las señales respiratorias originales sí pueden ser entradas.
 
 Indicadores calculados a partir de `Sleep_Stage` (proporciones, latencias y transiciones) sirven para describir el registro, no para predecir esa misma etiqueta: incorporarlos produciría fuga de información. Comparar PSG + wearable y wearable solo requiere conjuntos de entrada y modelos propios, con las mismas particiones por paciente.
+
+## Escenario acordado para modelar
+
+Identificar la etapa del epoch actual; no anticipar la siguiente. Usar características wearable como `X` y la etapa anotada por PSG como `y`. Las señales PSG no son necesarias como entradas para aprender esa relación. Un modelo comparativo que las use como predictores debe entrenarse y evaluarse por separado; retirarlas durante inferencia no lo convierte en un modelo wearable.
 
 ## Variables incluidas y excluidas
 

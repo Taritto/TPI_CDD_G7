@@ -40,3 +40,9 @@ Cobertura, variación y asociación descriptiva orientan candidatos. Su aporte s
 En 3.5.1 se contrastan, por paciente, medianas de una etapa frente al resto para `HR_median`, `TEMP_median`, `EDA_median`, `BVP_std`, `ACC_X_std`, `C4-M1_std`, `E1_std` y `FLOW_std`. Se requieren al menos cinco epochs válidos en cada grupo; casos sin cobertura suficiente no se convierten en cero.
 
 Antes de retirar o conservar definitivamente una característica, registrar significado, unidad, calidad/cobertura, patrón entre pacientes, redundancia y resultado de ablación (modelo con y sin ella). Mantener iguales las particiones y observar métricas por clase. Una superposición visual, un coeficiente alto o pasar los controles de construcción no sustituye esa comparación.
+
+## Límite de los resúmenes por epoch
+
+Media, mediana y desviación estándar no preservan completamente el orden temporal ni la estructura de frecuencia de las muestras. Dos epochs pueden tener resúmenes similares y patrones internos distintos. Esta pérdida de información es una limitación posible de la representación, no evidencia de un error de ETL ni de degradación del modelo con el paso del tiempo.
+
+Si errores de validación justifican ampliar características, considerar resúmenes de cambios internos o frecuencia solo del wearable, contrastando una ampliación acotada contra la referencia con las mismas particiones por paciente. No agregar características por anticipación ni ajustar su selección consultando la prueba final. La distribución cambiante de datos en uso sería un problema distinto, que exigiría seguimiento propio.
