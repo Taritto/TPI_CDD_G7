@@ -54,6 +54,19 @@ Cada responsable modifica solo su bloque de notebook y documentación correspond
 
 Los resultados se comparan con las mismas particiones y métricas. Evaluar precisión, recuperación y F1 de **W, N1, N2, N3 y REM**, además de F1 macro: atención a una minoritaria no sustituye evaluar las otras cuatro. La comparación final debe señalar cobertura y tradeoffs, no elegir solo por exactitud global.
 
+## Cómo leer las métricas
+
+Para cada etapa (por ejemplo, N3):
+
+- **Precisión:** de los epochs que el modelo predijo como N3, qué proporción era realmente N3. Indica cuánto confiar en esa predicción.
+- **Recuperación:** de todos los epochs que realmente eran N3, qué proporción detectó. Indica cuántos casos logra encontrar.
+- **F1:** combina precisión y recuperación; será alto solo si ambas son altas. Se calcula como `2 × precisión × recuperación / (precisión + recuperación)` y va de 0 a 1; cuanto mayor, mejor.
+- **F1 macro:** calcular F1 para W, N1, N2, N3 y REM y promediar los cinco con igual peso. Así una etapa frecuente como N2 no domina la medida. Acompañarlo con los resultados de cada etapa, porque el promedio puede ocultar diferencias.
+
+Por ejemplo: si hay 100 epochs N3, el modelo marca 50 como N3 y acierta 40, su precisión es `40/50 = 0,80`, su recuperación `40/100 = 0,40` y su F1 aproximadamente `0,53`. Sus predicciones N3 suelen ser correctas, pero dejó sin detectar muchos N3. Estos números son ilustrativos, no resultados del proyecto.
+
+**Exactitud global** es la proporción de todos los epochs clasificados correctamente; es distinta de la precisión por etapa. Si falta una etapa o el modelo nunca la predice, informar el caso y la convención usada para calcular las métricas, sin interpretarlo como buen desempeño.
+
 ## Estado y materiales
 
 **Preparación, sin modelos ejecutados.** El alcance se contrastó con la consigna disponible; el equipo debe incorporar cualquier indicación adicional de la cátedra antes de fijar experimentos.
