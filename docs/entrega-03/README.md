@@ -4,15 +4,15 @@ La [consigna disponible](<../transversal/Trabajo Práctico 2026.pdf>) pide selec
 
 ## Objetivo y evaluación acordados
 
-Identificar `Sleep_Stage` (W, N1, N2, N3 o R/REM) del **epoch actual de 30 segundos** utilizando únicamente características del wearable. La etiqueta anotada mediante PSG es la respuesta de entrenamiento (`y`), no una entrada (`X`). No se anticipa la etapa siguiente.
+Identificar `Sleep_Stage` (W, N1, N2, N3 o R/REM) del **epoch actual de 30 segundos** utilizando características de **wearable + PSG como escenario principal**. El escenario **solo wearable** será la comparación secundaria. La etiqueta anotada mediante PSG es la respuesta de entrenamiento (`y`), no una entrada (`X`); las características de las señales PSG sí pueden entrar en el escenario principal. No se anticipa la etapa siguiente.
 
-El ETL base mantiene sus 128 columnas y supera el mínimo de 50 indicado por el docente según la aclaración del equipo. Ese requisito del dataset entregable no obliga a usar todas sus columnas como predictores. La copia ya exportada de 22 predictores corresponde a PSG + wearable: no se usará completa en el modelo principal.
+El ETL base mantiene sus 128 columnas. El equipo prioriza wearable + PSG para atender la indicación docente de trabajar con varias entradas. La copia ya exportada de **22 predictores (7 wearable y 15 PSG)** es el punto de partida principal. El mínimo de 50 columnas del dataset no equivale a 50 predictores: si el docente exige ese mínimo para las entradas del modelo, esta candidata aún no lo cumple y habrá que aclarar el requisito antes de fijar las características.
 
-Como punto de partida, la definición wearable del notebook contempla `HR_median`, `HR_std`, `TEMP_median`, `EDA_median`, `EDA_std`, `BVP_std`, `ACC_X_std`, `ACC_Y_std` y `ACC_Z_std`. La variante combinada sustituye BVP/EDA por log1p y los tres ejes por `ACC_axes_std_norm_log1p`. Se decidirá la variante mediante validación; identificadores, objetivo y columnas PSG no entran en el modelo principal. El tiempo queda fuera de la primera comparación.
+Para la comparación secundaria, la definición wearable del notebook contempla `HR_median`, `HR_std`, `TEMP_median`, `EDA_median`, `EDA_std`, `BVP_std`, `ACC_X_std`, `ACC_Y_std` y `ACC_Z_std`. La variante combinada sustituye BVP/EDA por log1p y los tres ejes por `ACC_axes_std_norm_log1p`. Se decidirá la variante mediante validación; identificadores y objetivo no entran en ningún modelo; las columnas PSG quedan fuera del secundario solo wearable. El tiempo queda fuera de la primera comparación.
 
 Desarrollar y comparar con los 76 pacientes actualmente incluidos, separando **pacientes de entrenamiento y validación**. Los pacientes adicionales, que el equipo declara no utilizados en exploración ni decisiones anteriores, se reservan como prueba final: no incorporarlos al ajuste o selección. Verificar etiquetas, disponibilidad y calidad antes de la evaluación final con las mismas reglas del ETL.
 
-La comparación PSG + wearable será secundaria, con un modelo independiente y las mismas particiones. Permite contrastar el aporte de señales adicionales; un modelo entrenado con ellas no puede simplemente retirarlas al predecir con wearable.
+La comparación solo wearable tendrá un modelo independiente, las mismas particiones y métricas que el principal. Informar F1 macro, exactitud y precisión/recuperación por etapa de ambos escenarios para contrastar el aporte de PSG. Un modelo entrenado con PSG no puede simplemente retirarla al predecir con wearable.
 
 ## Tareas y dependencias
 
@@ -20,17 +20,17 @@ Se puede trabajar por módulos, pero las entradas, particiones y evaluación deb
 
 | Tarea | Trabajo y resultado verificable | Depende de | Responsable |
 | --- | --- | --- | --- |
-| T1 · Datos y particiones | Validar el ETL de partida, definir columnas wearable y separar IDs de entrenamiento/validación. Registrar semilla, pacientes y cobertura de las cinco etapas; mantener pacientes nuevos fuera. | Acuerdos de esta página | Por asignar |
-| T2 · Selección teórica | Revisar las presentaciones; justificar dos o tres candidatos y descarte por grupos. Definir una lista pequeña de configuraciones iniciales, todavía sin elegir ganador. | Objetivo wearable | Por asignar |
+| T1 · Datos y particiones | Validar el ETL de partida, definir columnas de wearable + PSG y del secundario solo wearable, y separar IDs de entrenamiento/validación. Registrar semilla, pacientes y cobertura de las cinco etapas; mantener pacientes nuevos fuera. | Acuerdos de esta página | Por asignar |
+| T2 · Selección teórica | Revisar las presentaciones; justificar dos o tres candidatos y descarte por grupos. Definir una lista pequeña de configuraciones iniciales, todavía sin elegir ganador. | Objetivo wearable + PSG | Por asignar |
 | T3 · Evaluación común | Preparar una función compartida de entrenamiento/evaluación y un clasificador trivial. Ajustar preprocesamiento solo con entrenamiento; obtener F1 macro, métricas por etapa, matriz de confusión y tiempos. | T1 y configuraciones de T2 | Por asignar |
-| T4 · Modelos candidatos | Cada integrante implementa uno de los candidatos con las mismas particiones y función de evaluación. Entregar configuración, predicciones de validación, métricas y tiempos, sin tocar datos o particiones compartidos. | T1–T3 completos | Repartir un modelo por integrante |
+| T4 · Modelos candidatos | Cada integrante implementa uno de los candidatos del escenario principal wearable + PSG con las mismas particiones y función de evaluación. Entregar configuración, predicciones de validación, métricas y tiempos, sin tocar datos o particiones compartidos. | T1–T3 completos | Repartir un modelo por integrante |
 | T5 · Ajustes y comparación | Consolidar resultados; comparar variantes originales/log1p/ACC y sin pesos/con pesos cuando el algoritmo lo admita. Ampliar ajustes solo si resuelven una pregunta concreta; elegir configuración con validación y costo. | Resultados de T4 | Por asignar |
 | T6 · Errores y conclusiones | Revisar las cinco etapas, confusiones y variación por paciente. Distinguir calidad de datos, representación y algoritmo como explicaciones posibles; documentar evidencia y límites, sin atribuir causas clínicas no comprobadas. | Predicciones de T4; cerrar tras T5 | Por asignar |
-| T7 · Comparación secundaria | Entrenar un modelo independiente PSG + wearable con la misma partición y evaluación. Presentar como contraste secundario, sin desplazar el objetivo wearable. | T3 y referencia wearable de T4 | Por asignar |
+| T7 · Comparación secundaria | Entrenar un modelo independiente solo wearable con la misma partición y evaluación. Comparar sus métricas con el principal wearable + PSG. | T3 y referencia wearable + PSG de T4 | Por asignar |
 | T8 · Prueba final | Congelar modelo/configuración elegidos; procesar pacientes reservados con las mismas reglas y verificar sus IDs y cobertura. Evaluar una vez para el cierre, sin reajustar según esa prueba. Informar exclusiones y límites de cobertura. | T5 cerrado; T6 revisado | Por asignar |
 | T9 · Informe | Integrar método, comparación, resultados y conclusiones. Cada responsable redacta su bloque cuando lo completa; el cierre incorpora la prueba final y distingue propuestas futuras. | Redacción durante T1–T7; cierre tras T8 | Por asignar |
 
-**Orden práctico:** T1 y T2 pueden avanzar en paralelo → T3 → candidatos de T4 en paralelo → T5 y análisis T6 → T8 → cierre T9. T7 puede avanzar tras la primera referencia wearable; si limita el tiempo, se prioriza cerrar el escenario principal. Revisiones instrumentales puntuales se abren solo con evidencia; un cambio en entradas o particiones exige repetir las comparaciones afectadas.
+**Orden práctico:** T1 y T2 pueden avanzar en paralelo → T3 → candidatos de T4 en paralelo → T5 y análisis T6 → T8 → cierre T9. T7 puede avanzar tras la primera referencia wearable + PSG; si limita el tiempo, se prioriza cerrar el escenario principal. Revisiones instrumentales puntuales se abren solo con evidencia; un cambio en entradas o particiones exige repetir las comparaciones afectadas.
 
 ## Outline de la sección de modelado del notebook
 
@@ -39,10 +39,10 @@ La numeración siguiente es una propuesta para reemplazar la sección 4 de próx
 - **4.1. Datos, objetivo y particiones por paciente** — T1.
 - **4.2. Algoritmos y configuraciones iniciales** — T2.
 - **4.3. Evaluación común y referencia trivial** — T3.
-- **4.4. Modelos wearable** — T4; un bloque independiente por candidato.
+- **4.4. Modelos wearable + PSG** — T4; un bloque independiente por candidato.
 - **4.5. Ajustes y comparación en validación** — T5.
 - **4.6. Análisis de errores por etapa y paciente** — T6.
-- **4.7. Comparación secundaria PSG + wearable** — T7.
+- **4.7. Comparación secundaria solo wearable** — T7.
 - **4.8. Evaluación final en pacientes reservados** — T8.
 - **4.9. Conclusiones y límites** — síntesis para T9.
 

@@ -1,6 +1,6 @@
 # Contexto común del proyecto
 
-Objetivo: identificar la etapa del epoch actual de 30 segundos (W, N1, N2, N3 o REM) usando señales del wearable de DREAMT, con la etapa anotada por PSG como referencia. PSG + wearable se estudiará como comparación secundaria con un modelo independiente. La etapa objetivo es categórica. Cada entrega documenta sus propios resultados; las [decisiones comunes](../adr/README.md) mantienen las reglas que siguen aplicándose.
+Objetivo: identificar la etapa del epoch actual de 30 segundos (W, N1, N2, N3 o REM) usando señales de wearable + PSG de DREAMT como escenario principal, con la etapa anotada por PSG como referencia. Solo wearable se estudiará como comparación secundaria con un modelo independiente y las mismas particiones y métricas. La etapa objetivo es categórica. Cada entrega documenta sus propios resultados; las [decisiones comunes](../adr/README.md) mantienen las reglas que siguen aplicándose.
 
 ## Fuentes y materiales
 

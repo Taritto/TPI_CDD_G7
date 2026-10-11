@@ -7,7 +7,7 @@ date: 2026-09-28
 
 ## Implementación vigente
 
-Las anotaciones de apnea y los indicadores derivados de Sleep_Stage quedan fuera de los predictores candidatos. SAO2 e IBI tampoco integran el ETL de señales actual. La copia candidata ya construida es PSG + wearable. Para la entrega 3 se acordó wearable como escenario principal y PSG + wearable como comparación secundaria; los modelos todavía no están entrenados.
+Las anotaciones de apnea y los indicadores derivados de Sleep_Stage quedan fuera de los predictores candidatos. SAO2 e IBI tampoco integran el ETL de señales actual. La copia candidata ya construida es PSG + wearable. Para la entrega 3 se acordó wearable + PSG como escenario principal y solo wearable como comparación secundaria; los modelos todavía no están entrenados.
 
 Fuente: [notebook principal](../../temporal_version_tp_cdd.ipynb).
 
@@ -19,7 +19,7 @@ Indicadores calculados a partir de `Sleep_Stage` (proporciones, latencias y tran
 
 ## Escenario acordado para modelar
 
-Identificar la etapa del epoch actual; no anticipar la siguiente. Usar características wearable como `X` y la etapa anotada por PSG como `y`. Las señales PSG no son necesarias como entradas para aprender esa relación. Un modelo comparativo que las use como predictores debe entrenarse y evaluarse por separado; retirarlas durante inferencia no lo convierte en un modelo wearable.
+Identificar la etapa del epoch actual; no anticipar la siguiente. Usar características wearable + PSG como `X` del escenario principal y la etapa anotada por PSG como `y`. El equipo prioriza este escenario por la indicación docente de trabajar con varias entradas. Entrenar por separado un modelo secundario con solo wearable y comparar ambos con las mismas particiones y métricas. Retirar PSG durante inferencia del modelo principal no lo convierte en un modelo wearable. El número de columnas del ETL no determina el número de predictores; el requisito exacto de cantidad de entradas debe confirmarse según el [acuerdo de entrega 3](../entrega-03/README.md#objetivo-y-evaluación-acordados).
 
 ## Variables incluidas y excluidas
 
