@@ -1,5 +1,6 @@
 # Datos locales pesados
-/pacientes/
+/pacientes
+/output
 
 # Salidas locales regenerables del ETL
 /etl_v1/
