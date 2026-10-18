@@ -7,27 +7,31 @@ date: 2026-09-29
 
 ## Implementación vigente
 
-La entrega 2 comprende preparación, análisis y copia candidata. La sección 4 plantea modelos y evaluación para continuar; no hay entrenamiento ni métricas predictivas en el notebook actual. La consigna disponible incluye modelado, evaluación e interpretación en la entrega 3.
-
-Fuente: [notebook principal](../../temporal_version_tp_cdd.ipynb).
+La entrega 2 comprende preparación, análisis y copia candidata. El [notebook autónomo de entrega 3](../../temporal_version_tp_entrega03.ipynb) implementa el flujo de modelado. La referencia anterior se preservó con código/salidas. Se amplió la decisión a dos escenarios: personas nuevas y futuras lecturas de pacientes conocidos. Estado de ejecución y candidatos en [entrega 3](../entrega-03/README.md); test final pendiente.
 
 ## Decisión y motivo
 
-Cerrar la preparación antes de atribuir resultados a modelos. Los mapas descriptivos y controles de integridad no demuestran precisión predictiva. La sección 4 presenta propuestas, no entrenamientos ejecutados.
+Clasificación multiclase, no ordinal. Los mapas descriptivos no demuestran rendimiento predictivo. Separar implementado y ejecutado; comparar Dummy, logística, RF y XGB. Escalado y pesos solo se ajustan con entrenamiento.
 
-La tarea futura es clasificación multiclase, no ordinal. Comparar referencia trivial, regresión logística multiclase, Random Forest y XGBoost con particiones por paciente. Escalado, selección y posibles pesos se ajustan dentro de entrenamiento; validación orienta decisiones y la prueba final se reserva.
+Reservar aproximadamente 20 % de pacientes completos para test interno, semilla 42, sin compartir pacientes con desarrollo. Dentro de desarrollo, comparar cinco folds StratifiedGroupKFold por paciente frente a StratifiedKFold por epochs mezclados con configuraciones fijas. Conservar esta mezcla como diagnóstico, sin elegir por la cifra más alta entre protocolos. Por decisión explícita del usuario, seleccionar candidatos separados para personas nuevas y pacientes conocidos; no se consultó test. Ambos modelos predicen epochs, no cambia la unidad de predicción.
 
-Se acuerda usar `StratifiedGroupKFold` con pacientes como grupos para evitar compartir personas entre entrenamiento y validación e intentar conservar las proporciones de etapas. La validación cruzada permite comparar modelos en varios conjuntos de pacientes, reduciendo la dependencia de una única división. La estratificación no balancea clases ni garantiza cobertura suficiente de cada etapa; debe comprobarse antes de entrenar. Esta estrategia está acordada, aún pendiente de implementación y verificación; el detalle operativo se mantiene en el [README de entrega 3](../entrega-03/README.md#objetivo-y-evaluación-acordados).
+Personas nuevas: validación por pacientes separados. Pacientes conocidos: seis bloques cronológicos por persona, el primero inicializa entrenamiento y los cinco siguientes se evalúan con entrenamiento creciente; separar entrenamiento y validación por 15 minutos. Los epochs iniciales no tienen predicción OOF. Guardar elegibilidad, cobertura y asignaciones. El mismo catálogo de variantes se evalúa dentro de ambos escenarios; cada escenario tiene su propia selección.
+
+El escenario conocido presupone observaciones pasadas etiquetadas disponibles para entrenar; recibir señales pasadas sin anotaciones no implica que el modelo conozca a esa persona. Las etiquetas de entrenamiento no se incorporan como características de historia durante inferencia.
+
+Contexto temporal: señales anteriores del mismo paciente y segmento continuo, nunca etiquetas reales previas ni datos futuros. Historia ausente se conserva como NaN con indicador de disponibilidad; imputación aprendida dentro del entrenamiento. SMOTE se prueba por separado y únicamente dentro del entrenamiento. Reglas de balanceo en [ADR 0009](0009-distribuciones-y-desbalance-de-etapas.md).
+
+El test interno tuvo exposición en EDA y comparaciones previas: declarar esta limitación. Congelar configuración, reentrenar con todo desarrollo y evaluar sin reajuste posterior. Guardar marcador de apertura para evitar repetir inadvertidamente. Pacientes adicionales futuros permitirán evaluación externa separada. Detalle operativo en el README de entrega 3.
 
 ## Alternativas y criterio de comparación
 
-Una división única por paciente es más económica, pero depende más de los pacientes asignados; `GroupKFold` mantiene separados los pacientes sin intentar conservar las proporciones de etapas. Se prioriza `StratifiedGroupKFold` por el desbalance y la presencia desigual de etapas entre personas.
+Una división única por paciente es más económica, pero depende más de los pacientes asignados; `GroupKFold` mantiene separados los pacientes sin intentar conservar las proporciones de etapas. Se conserva StratifiedGroupKFold para personas desconocidas y validación cronológica para el futuro de personas conocidas. No hay ganador universal entre ambas preguntas.
 
 El clasificador trivial permite saber qué se logra sin distinguir etapas; regresión logística multiclase ofrece una referencia inicial y Random Forest/XGBoost permiten contrastar relaciones no lineales e interacciones. Son candidatos, no ganadores aprobados ni requisitos específicos de la cátedra.
 
-Comparar escenarios y representaciones con las mismas particiones por paciente. La validación orienta modelos, parámetros y características; reservar la prueba para la evaluación final acordada. Informar F1 macro, matriz de confusión, precisión/recuperación por etapa y variación entre pacientes. La elección debe considerar desempeño y disponibilidad real de señales, especialmente si se propone usar solo wearable.
+Comparar escenarios y representaciones con las mismas particiones del protocolo elegido. La validación orienta modelos, parámetros y características; reservar la prueba para la evaluación final acordada. Informar F1 macro, matriz de confusión, precisión/recuperación por etapa y variación entre pacientes. La elección debe considerar desempeño y disponibilidad real de señales, especialmente si se propone usar solo wearable.
 
-Guardar predicciones y probabilidades de validación por fold, configuración y escenario para el diagnóstico global: cada epoch se predice una vez por un modelo que no entrenó con su paciente. La matriz acumulada y las curvas Precision-Recall complementan métricas por etapa, fold y paciente; no prueban generalización final ni describen por sí solas transiciones temporales. Su construcción se especifica en [entrega 3](../entrega-03/README.md#diagnóstico-global-por-modelo).
+Guardar predicciones y probabilidades de validación por fold, configuración y escenario: cada epoch elegible se predice una vez por un modelo que no entrenó con su etiqueta. Solo el protocolo por pacientes garantiza no haber entrenado con su persona; el cronológico utiliza únicamente su pasado. La matriz acumulada y las curvas Precision-Recall complementan métricas por etapa, fold y paciente. El test reservado por personas evalúa el primer escenario y no constituye una prueba cronológica independiente para personas conocidas. Detalle en [entrega 3](../entrega-03/README.md#qué-mirar).
 
 ## Alcance
 

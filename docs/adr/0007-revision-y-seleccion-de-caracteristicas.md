@@ -7,7 +7,7 @@ date: 2026-09-29
 
 ## Implementación vigente
 
-Se construyó una copia candidata en 3.9 con 22 predictores, 3 columnas de trazabilidad y 1 objetivo. Se combinan ojos/piernas/ACC y se aplica log1p; el ETL base conserva sus 128 columnas. Selección final y mejora predictiva pendientes de modelado.
+Se construyó una copia candidata en 3.9 con 22 predictores, 3 columnas de trazabilidad y 1 objetivo. Se combinan ojos/piernas/ACC y se aplica log1p; el ETL base conserva sus 128 columnas. La primera ronda de entrega 3 por pacientes favoreció provisionalmente canales separados para RF (26 entradas) y candidata para XGB (22 entradas); log1p aportó poco en esos árboles. La ampliación compara representaciones por escenario e historia de señales pasadas sobre el ganador base de cada uno. No cambia el ETL ni establece selección definitiva antes del cierre. Estado y resultados en el [README de entrega 3](../entrega-03/README.md).
 
 Fuente: [notebook principal](../../temporal_version_tp_cdd.ipynb).
 
@@ -31,9 +31,9 @@ La implementación exige entradas finitas y no negativas para estas transformaci
 
 Alternativas previstas: características originales, transformaciones por separado y variante combinada. Los canales EEG `C4-M1_std`, `F4-M1_std`, `O2-M1_std`, `Fp1-O2_std`, `T3 - CZ_std` y `CZ - T4_std` permanecen: su correlación no demuestra que puedan retirarse sin afectar el modelo.
 
-## Validación pendiente
+## Validación de características
 
-Cobertura, variación y asociación descriptiva orientan candidatos. Su aporte se comprueba mediante modelos y ablaciones, con preprocesamiento ajustado solo en entrenamiento. No seleccionar por un número arbitrario de predictores ni borrar alternativas del ETL base.
+Cobertura, variación y asociación descriptiva orientan candidatos. Su aporte se comprueba mediante modelos y ablaciones, con preprocesamiento ajustado solo en entrenamiento. La primera ronda está ejecutada en entrega 3; test final pendiente. No seleccionar por un número arbitrario de predictores ni borrar alternativas del ETL base.
 
 ## Criterio para decidir después
 
@@ -46,3 +46,5 @@ Antes de retirar o conservar definitivamente una característica, registrar sign
 Media, mediana y desviación estándar no preservan completamente el orden temporal ni la estructura de frecuencia de las muestras. Dos epochs pueden tener resúmenes similares y patrones internos distintos. Esta pérdida de información es una limitación posible de la representación, no evidencia de un error de ETL ni de degradación del modelo con el paso del tiempo.
 
 Si errores de validación justifican ampliar características, considerar resúmenes de cambios internos o frecuencia solo del wearable, contrastando una ampliación acotada contra la referencia con las mismas particiones por paciente. No agregar características por anticipación ni ajustar su selección consultando la prueba final. La distribución cambiante de datos en uso sería un problema distinto, que exigiría seguimiento propio.
+
+La ampliación autorizada de modelado usa señales retrasadas de 1/2/5/10/15 minutos y combinaciones acotadas. Mantener paciente y segmento continuo de epochs de 30 segundos; un hueco reinicia historia. Ausencia de antecedentes se expresa con NaN e indicador de disponibilidad, sin eliminar epochs; imputar con entrenamiento y conservar columnas completamente vacías con valor constante. No usar etiquetas reales anteriores ni futuro. La disponibilidad también puede representar tiempo transcurrido: no atribuir una mejora únicamente a contenido fisiológico pasado. Las reglas y resultados pertenecen al modelado; los CSV fuente quedan intactos.

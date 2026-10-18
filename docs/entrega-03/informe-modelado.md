@@ -1,0 +1,256 @@
+# Informe de modelado · decisiones y exposición
+
+## Objetivo y alcance
+
+Predecir la etapa del sueño de un epoch de 30 segundos: W, N1, N2, N3 o REM. El notebook recibe dos CSV ya preparados; no reconstruye señales ni repite EDA/ETL. El escenario actual dispone de wearable y PSG: no demuestra desempeño de un dispositivo wearable aislado.
+
+La cátedra solicita seleccionar técnicas, ajustar parámetros, evaluar e interpretar. Los protocolos por paciente, validación cronológica, XGBoost, historia y SMOTE son decisiones metodológicas del proyecto, no algoritmos exigidos por la consigna.
+
+## Desde la versión anterior hasta el flujo actual
+
+La versión anterior comparaba modelos sobre los 76 pacientes sin test interno reservado. Sus métricas y configuraciones se conservaron en [referencia-previa.json](referencia-previa.json); el notebook ANTERIOR permaneció intacto. XGBoost ponderado alcanzaba F1 macro 0,4923; RF sin pesos tenía mayor exactitud (0,6612). Son antecedentes de otra partición: no sirven para atribuir mejoras causales frente a desarrollo reducido.
+
+Se independizó modelado del ETL, validó la coincidencia completa de CSV y reservó 20 % de pacientes con semilla 42. Se guardaron asignaciones y huellas; identificadores y objetivo se excluyen de predictores. Se recuperaron explicaciones de modelos, parámetros, pesos y métricas y se reemplazaron tablas extensas por resúmenes legibles.
+
+Se compararon referencias Dummy/logística/RF/XGBoost, ponderación, variantes individuales de hiperparámetros y representaciones. Luego se ampliaron las pruebas a dos escenarios de uso, contexto temporal y SMOTE. Los diagnósticos se separaron en importancia, errores, PR, ROC y pacientes. Cada prueba tiene referencia y conclusión en la [guía](experimentos-hiperparametros.md).
+
+Dos escenarios de selección, sin consultar el test. Desarrollo: 45.011 epochs de 60 pacientes; reserva: 11.839 epochs de 16 pacientes. El protocolo por pacientes evalúa todos los epochs de desarrollo. El cronológico evalúa 37.490 epochs; excluye de validación los 7.521 del bloque inicial, conservados para entrenamiento. Cinco folds por escenario; gap cronológico de 15 minutos.
+
+Se ejecutaron 147 comparaciones documentadas: Hiperparámetro: 84, Protocolo: 14, Contexto temporal: 14, Pesos: 9, SMOTE: 8, Representación: 8, Balanceo control: 6, Control: 4. Las referencias de epochs mezclados se conservan como diagnóstico. Las cifras son de desarrollo, no de prueba final.
+
+## Qué pregunta responde cada protocolo
+
+| Modelo | Pesos | Pacientes separados | Epochs mezclados | Cronológico |
+| --- | --- | --- | --- | --- |
+| RF | No | 0.3847 ± 0.0284 | 0.7617 ± 0.0083 | 0.4822 ± 0.0591 |
+| RF | Sí | 0.4412 ± 0.0288 | 0.7860 ± 0.0081 | 0.5424 ± 0.0681 |
+| XGB | No | 0.4465 ± 0.0322 | 0.7418 ± 0.0077 | 0.5133 ± 0.0604 |
+| XGB | Sí | 0.4859 ± 0.0299 | 0.7273 ± 0.0052 | 0.5452 ± 0.0448 |
+
+**Personas nuevas:** pacientes completos separados entre entrenamiento y validación. Es la evidencia pertinente para una persona no vista al entrenar.
+
+**Pacientes conocidos:** entrenamiento creciente con observaciones anteriores de cada paciente y cinco bloques futuros de validación. Se deja un gap de 15 minutos. Este escenario presupone datos pasados etiquetados disponibles para entrenar; tener únicamente señales pasadas sin anotaciones no equivale a haber entrenado con esa persona. Las etiquetas pasadas se usan como objetivo de entrenamiento, nunca como características de entrada al predecir. El inicio de la noche ofrece pocos ejemplos de ciertas etapas; el cambio de distribución a lo largo de la noche forma parte de este escenario.
+
+**Epochs mezclados:** personas y momentos próximos aparecen en ambos conjuntos. Su F1 mayor puede reflejar semejanza entre registros conocidos; no demuestra generalización a personas nuevas ni al futuro. Ambos candidatos predicen epochs: el protocolo es una regla de evaluación, no otra unidad de salida.
+
+## Algoritmos, pesos y ajustes
+
+Dummy establece un piso sin distinguir etapas. Logística ofrece una referencia lineal; RF y XGBoost representan interacciones no lineales. Todos se comparan con los mismos folds dentro de cada escenario.
+
+Los pesos cambian el costo de errores por clase y se calculan solo con entrenamiento. Pueden elevar recuperación minoritaria y también falsas alarmas; no garantizan mayor exactitud ni F1. Se variaron C, profundidad, tamaño de hojas, cantidad de árboles/rondas, muestreo, tasa y regularización, según el algoritmo. Variar un parámetro no demuestra que una combinación posterior será mejor.
+
+### Personas nuevas · ajustes y representación
+
+- **Logistica:** `ajuste_Logistica_pesos1_C_10`; F1 0.3469 ± 0.0388, brecha 0.0729.
+- **RF:** `representacion_RF_separada_con_log`; F1 0.4680 ± 0.0302, brecha 0.3731.
+- **XGB:** `representacion_XGB_candidata`; F1 0.4907 ± 0.0327, brecha 0.2879.
+
+| Representación | Modelo | ΔF1 | Lectura |
+| --- | --- | --- | --- |
+| Sin log1p; canales combinados | Random Forest | -0.0001 | Sin prioridad frente a la referencia por F1 macro. |
+| Canales separados; conservar log1p | Random Forest | 0.0066 | Conservar como candidato de esta ronda; no afirmar un óptimo global. |
+| Sin log1p; canales combinados | XGBoost | 0.0000 | Sin prioridad frente a la referencia por F1 macro. |
+| Canales separados; conservar log1p | XGBoost | -0.0093 | No priorizar para esta ronda según F1 macro. |
+
+### Pacientes conocidos: lecturas futuras · ajustes y representación
+
+- **Logistica:** `temporal_ajuste_Logistica_pesos1_C_10`; F1 0.3685 ± 0.0345, brecha 0.0983.
+- **RF:** `temporal_representacion_RF_separada_con_log`; F1 0.5526 ± 0.0730, brecha 0.4052.
+- **XGB:** `temporal_representacion_XGB_candidata`; F1 0.5567 ± 0.0522, brecha 0.3827.
+
+| Representación | Modelo | ΔF1 | Lectura |
+| --- | --- | --- | --- |
+| Sin log1p; canales combinados | Random Forest | 0.0002 | Sin prioridad frente a la referencia por F1 macro. |
+| Canales separados; conservar log1p | Random Forest | 0.0066 | Conservar como candidato de esta ronda; no afirmar un óptimo global. |
+| Sin log1p; canales combinados | XGBoost | 0.0000 | Sin prioridad frente a la referencia por F1 macro. |
+| Canales separados; conservar log1p | XGBoost | -0.0110 | No priorizar para esta ronda según F1 macro. |
+
+**Lección de regularización:** aumentar las hojas de RF no tiene el mismo efecto en ambos escenarios. Una menor brecha no alcanza para recomendar el cambio:
+
+| Escenario | RF pesos: hoja 2 → 10 | Δ F1 | Δ brecha |
+| --- | --- | --- | --- |
+| Personas nuevas | 0.4412 → 0.4614 | 0.0201 | -0.1430 |
+| Pacientes conocidos: lecturas futuras | 0.5424 → 0.5188 | -0.0236 | -0.0953 |
+
+En XGBoost ponderado para pacientes conocidos, profundidad 4 → 6 elevó F1 0.5452 → 0.5567, pero la brecha creció de 0.2952 a 0.3827. Hay mayor capacidad y mejor validación observada, junto con más separación respecto del entrenamiento; no corresponde declarar eliminado el sobreajuste.
+
+Distribución del primer fold cronológico; permite interpretar la escasez inicial de algunas etapas:
+
+| etapa | entrenamiento | validacion |
+| --- | --- | --- |
+| W | 1220 | 1488 |
+| N1 | 884 | 789 |
+| N2 | 3117 | 4138 |
+| N3 | 471 | 533 |
+| R | 29 | 569 |
+
+## Contexto temporal: qué se probó y qué ocurrió
+
+Se agregó el pasado de las mismas señales utilizadas por el ganador base de cada escenario, manteniendo modelo e hiperparámetros. Se probaron 1, 2, 5, 10 y 15 minutos, 5+10 y los dos retardos individuales mejor posicionados. La búsqueda es acotada: no identifica el mejor tiempo posible fuera de esa grilla.
+
+Cada paciente y discontinuidad reinicia historia. Si no existe antecedente, se conserva NaN y un indicador de disponibilidad; la mediana se ajusta dentro del entrenamiento. No se usan etapas reales anteriores, datos futuros ni historia de otro paciente. Al predecir secuencialmente sí pueden utilizarse señales de epochs de validación anteriores: estarían disponibles en uso real sin conocer su etiqueta.
+
+### Personas nuevas
+
+| Historia | F1 macro | ΔF1 | Brecha | Entrenamiento (s) |
+| --- | --- | --- | --- | --- |
+| Historia 1 minutos | 0.4964 | 0.0058 | 0.3023 | 29.7137 |
+| Historia 2 minutos | 0.4940 | 0.0033 | 0.3025 | 28.2759 |
+| Historia 5 minutos | 0.4881 | -0.0026 | 0.3053 | 28.6059 |
+| Historia 10 minutos | 0.4916 | 0.0009 | 0.3008 | 28.0415 |
+| Historia 15 minutos | 0.4927 | 0.0021 | 0.2993 | 28.2097 |
+| Historia 5+10 minutos | 0.4893 | -0.0014 | 0.3110 | 40.2214 |
+| Historia 1+2 minutos (dos mejores individuales) | 0.5053 | 0.0147 | 0.3010 | 42.0055 |
+
+**Resultado:** Historia 1+2 minutos (dos mejores individuales) obtuvo la mayor media temporal (0.5053; Δ +0.0147). Mayor F1 promedio en 4/5 folds; la brecha no se redujo claramente. Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+Disponibilidad de ese contexto en desarrollo completo:
+
+| minutos | disponibles | faltantes | fraccion |
+| --- | --- | --- | --- |
+| 1 | 44889 | 122 | 0.9973 |
+| 2 | 44767 | 244 | 0.9946 |
+
+### Pacientes conocidos: lecturas futuras
+
+| Historia | F1 macro | ΔF1 | Brecha | Entrenamiento (s) |
+| --- | --- | --- | --- | --- |
+| Historia 1 minutos | 0.5601 | 0.0034 | 0.3934 | 31.9296 |
+| Historia 2 minutos | 0.5502 | -0.0065 | 0.4025 | 31.4355 |
+| Historia 5 minutos | 0.5445 | -0.0122 | 0.4079 | 32.4101 |
+| Historia 10 minutos | 0.5341 | -0.0226 | 0.4169 | 31.9166 |
+| Historia 15 minutos | 0.5467 | -0.0100 | 0.4038 | 30.7936 |
+| Historia 5+10 minutos | 0.5409 | -0.0158 | 0.4170 | 45.3355 |
+| Historia 1+2 minutos (dos mejores individuales) | 0.5803 | 0.0236 | 0.3784 | 45.3840 |
+
+**Resultado:** Historia 1+2 minutos (dos mejores individuales) obtuvo la mayor media temporal (0.5803; Δ +0.0236). Mayor F1 promedio en 4/5 folds; también se redujo la brecha. Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+Disponibilidad de ese contexto en desarrollo completo:
+
+| minutos | disponibles | faltantes | fraccion |
+| --- | --- | --- | --- |
+| 1 | 44889 | 122 | 0.9973 |
+| 2 | 44767 | 244 | 0.9946 |
+
+Los indicadores también pueden reflejar tiempo transcurrido y comienzo de segmentos. El experimento no separa ese aporte del contenido fisiológico de las señales pasadas. No atribuir la diferencia únicamente a transiciones del sueño. Incorporar historia aumenta dimensiones y puede elevar el costo. Los tiempos de entrenamiento incluyen el preprocesamiento ajustado dentro del pipeline y excluyen la construcción previa de historia, importancia y gráficos. Son mediciones de esta corrida, sensibles a la carga y al calentamiento del equipo: una diferencia de tiempo no demuestra por sí sola un efecto del parámetro.
+
+## SMOTE: balancear no garantiza mejorar
+
+Se compararon la misma configuración sin pesos, con pesos, escalada sin remuestreo y cuatro variantes SMOTE. Los vecinos 3/5 y objetivos por clase de 50/100 % se calcularon dentro de entrenamiento; validación y test mantienen frecuencias reales. SMOTE interpola entre ejemplos de una clase: no aporta pacientes nuevos y puede producir combinaciones fisiológicamente poco representativas. No se combinó con pesos ni historia temporal.
+
+### Personas nuevas
+
+| Cambio | F1 macro | Δ contra referencia | Brecha | Entrenamiento (s) |
+| --- | --- | --- | --- | --- |
+| Misma configuración sin ponderación | 0.4491 | -0.0416 | 0.3507 | 17.8360 |
+| Misma configuración con pesos balanceados | 0.4907 | 0.0416 | 0.2879 | 17.7556 |
+| Escalado sin remuestreo ni pesos | 0.4451 | -0.0040 | 0.3545 | 17.7107 |
+| SMOTE objetivo 50% de mayoritaria; k=3 | 0.4830 | 0.0379 | 0.3147 | 27.1920 |
+| SMOTE objetivo 50% de mayoritaria; k=5 | 0.4818 | 0.0367 | 0.3148 | 27.2908 |
+| SMOTE objetivo 100% de mayoritaria; k=3 | 0.4860 | 0.0409 | 0.2911 | 42.1537 |
+| SMOTE objetivo 100% de mayoritaria; k=5 | 0.4806 | 0.0355 | 0.2926 | 12.5915 |
+
+**Resultado:** mejor SMOTE 0.4860; frente al ganador base 0.4907, diferencia -0.0046. No reemplazar al ganador base por SMOTE según estas medias.
+
+Efecto frente al ganador base sobre las etapas minoritarias:
+
+| Etapa | Δ precisión | Δ recuperación | Δ F1 |
+| --- | --- | --- | --- |
+| N1 | -0.0043 | -0.0088 | -0.0065 |
+| N3 | 0.0110 | -0.0288 | -0.0038 |
+
+### Pacientes conocidos: lecturas futuras
+
+| Cambio | F1 macro | Δ contra referencia | Brecha | Entrenamiento (s) |
+| --- | --- | --- | --- | --- |
+| Misma configuración sin ponderación | 0.5139 | -0.0428 | 0.4491 | 6.1448 |
+| Misma configuración con pesos balanceados | 0.5567 | 0.0428 | 0.3827 | 6.9855 |
+| Escalado sin remuestreo ni pesos | 0.5101 | -0.0037 | 0.4529 | 6.6856 |
+| SMOTE objetivo 50% de mayoritaria; k=3 | 0.5322 | 0.0221 | 0.4168 | 9.0537 |
+| SMOTE objetivo 50% de mayoritaria; k=5 | 0.5503 | 0.0401 | 0.3994 | 9.2449 |
+| SMOTE objetivo 100% de mayoritaria; k=3 | 0.5540 | 0.0438 | 0.3764 | 12.4528 |
+| SMOTE objetivo 100% de mayoritaria; k=5 | 0.5639 | 0.0537 | 0.3663 | 12.5369 |
+
+**Resultado:** mejor SMOTE 0.5639; frente al ganador base 0.5567, diferencia +0.0072. Conservar como alternativa por la mayor media observada, revisando etapas y costo.
+
+Efecto frente al ganador base sobre las etapas minoritarias:
+
+| Etapa | Δ precisión | Δ recuperación | Δ F1 |
+| --- | --- | --- | --- |
+| N1 | -0.0001 | -0.0005 | 0.0000 |
+| N3 | 0.0357 | 0.0513 | 0.0429 |
+
+## Candidatos y decisión provisional
+
+| Escenario | Candidato | F1 base | F1 candidato | Desviación | Exactitud | Brecha | Entrenamiento 5 folds (s) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Personas nuevas | contexto_pacientes_XGB_lag_1+2 | 0.4907 | 0.5053 | 0.0265 | 0.6043 | 0.3010 | 42.0055 |
+| Pacientes conocidos: lecturas futuras | contexto_temporal_XGB_lag_1+2 | 0.5567 | 0.5803 | 0.0698 | 0.7050 | 0.3784 | 45.3840 |
+
+### Personas nuevas
+
+**Configuración:** XGBoost, n_estimators=200, max_depth=4, learning_rate=0.1, min_child_weight=predeterminado, reg_lambda=5, subsample=0.8, colsample_bytree=0.8; con pesos; 68 predictores; historia 1+2 minutos; imputación por fold.
+
+**Debilidad:** N1 tiene F1 medio 0.2411, precisión 0.2375 y recuperación 0.2622. Brecha global 0.3010.
+
+| Etapa | Precisión | Recuperación | F1 medio entre folds |
+| --- | --- | --- | --- |
+| W | 0.5818 | 0.5978 | 0.5757 |
+| N1 | 0.2375 | 0.2622 | 0.2411 |
+| N2 | 0.8431 | 0.7026 | 0.7657 |
+| N3 | 0.4588 | 0.5977 | 0.4999 |
+| R | 0.4208 | 0.5089 | 0.4442 |
+
+En OOF acumulado, N1: F1 0.2417, AP 0.2173, ROC-AUC 0.7030. Estos agregados no equivalen al promedio entre folds.
+
+**Uso:** necesita el epoch actual y señales pasadas opcionales, procesadas con las mismas reglas de continuidad y faltantes.
+
+### Pacientes conocidos: lecturas futuras
+
+**Configuración:** XGBoost, n_estimators=200, max_depth=6, learning_rate=0.1, min_child_weight=predeterminado, reg_lambda=predeterminado, subsample=0.8, colsample_bytree=0.8; con pesos; 68 predictores; historia 1+2 minutos; imputación por fold.
+
+**Debilidad:** N1 tiene F1 medio 0.3351, precisión 0.3071 y recuperación 0.3792. Brecha global 0.3784.
+
+| Etapa | Precisión | Recuperación | F1 medio entre folds |
+| --- | --- | --- | --- |
+| W | 0.7070 | 0.7690 | 0.7363 |
+| N1 | 0.3071 | 0.3792 | 0.3351 |
+| N2 | 0.8243 | 0.8330 | 0.8274 |
+| N3 | 0.5277 | 0.7044 | 0.5986 |
+| R | 0.5552 | 0.3277 | 0.4042 |
+
+En OOF acumulado, N1: F1 0.3452, AP 0.2952, ROC-AUC 0.7804. Estos agregados no equivalen al promedio entre folds.
+
+**Uso:** necesita el epoch actual y señales pasadas opcionales, procesadas con las mismas reglas de continuidad y faltantes.
+
+## Importancia, errores y lectura de métricas
+
+La importancia por permutación se calcula en validación de los mejores RF/XGBoost sin historia/SMOTE, con cinco repeticiones por fold. Es caída de F1 al desordenar una señal, no porcentaje explicado ni causalidad. Se presenta por separado de los diagnósticos de candidatos finales. Correlaciones pueden esconder aportes compartidos.
+
+- **Personas nuevas · RF:** C4-M1_std (0.0301 ± 0.0215), F4-M1_std (0.0258 ± 0.0107), Fp1-O2_std (0.0255 ± 0.0180).
+- **Personas nuevas · XGB:** EOG_max_std (0.0580 ± 0.0116), CZ - T4_std (0.0463 ± 0.0317), F4-M1_std (0.0446 ± 0.0218).
+- **Pacientes conocidos: lecturas futuras · RF:** C4-M1_std (0.0708 ± 0.0343), Fp1-O2_std (0.0581 ± 0.0503), F4-M1_std (0.0562 ± 0.0431).
+- **Pacientes conocidos: lecturas futuras · XGB:** C4-M1_std (0.0642 ± 0.0203), EOG_max_std (0.0633 ± 0.0338), F4-M1_std (0.0551 ± 0.0404).
+
+F1 macro da igual peso a las cinco etapas; exactitud refleja todos los aciertos y puede favorecer N2. Precisión evalúa falsas detecciones; recuperación, casos omitidos; soporte, cantidad real. Mirar siempre las cinco etapas. Una brecha menor no basta si cae validación.
+
+PR muestra precisión frente a recuperación y AP resume su curva; prevalencia es la referencia. ROC-AUC mide separación frente al resto, pero un AUC alto no garantiza precisión útil para una etapa rara. Matrices identifican confusiones concretas; el análisis por paciente muestra heterogeneidad oculta por promedios. Las figuras completas están en 4.6 del notebook.
+
+## Límites y próximos pasos
+
+- Las configuraciones se seleccionaron usando validación repetidamente; el mayor F1 observado puede ser optimista. Diferencias pequeñas no prueban superioridad estadística y desviación entre folds no es intervalo de confianza.
+- El test reservado permanece cerrado y la configuración final no está congelada. Tuvo exposición histórica en EDA/comparaciones anteriores: no presentarlo como históricamente intacto.
+- El test por pacientes nuevos evalúa ese escenario. Para pacientes conocidos falta una evaluación temporal independiente de la selección. No promediar validación y test ni ajustar después de consultar la prueba final.
+- Los datos son wearable + PSG; solo wearable sigue pendiente. También quedan combinaciones de hiperparámetros, SMOTE+historia y evaluación externa con pacientes adicionales.
+- Próxima decisión: revisar la ganancia, debilidades y costo de cada candidato; congelar características, preprocesamiento, algoritmo e hiperparámetros para personas nuevas antes de abrir el test una vez.
+
+## Guion breve para exponer
+
+1. **Problema:** clasificar cada epoch en cinco etapas con señales fisiológicas; desbalance y diferencias entre personas dificultan la tarea.
+2. **Método:** preservar antecedentes, reservar pacientes para test y comparar referencias, pesos, parámetros y representaciones dentro de desarrollo.
+3. **Hallazgo metodológico:** mezclar epochs produce cifras diferentes de evaluar personas nuevas o futuro cronológico; responden preguntas distintas.
+4. **Experimentos:** señales pasadas y SMOTE se midieron por separado sobre los mejores modelos base, manteniendo referencias explícitas y sin etiquetas previas.
+5. **Decisión:** presentar un candidato por escenario con F1, etapas débiles y costo; no afirmar que es universalmente mejor ni que ya superó una prueba independiente.
+6. **Cierre:** congelar y evaluar sin reajustes sobre test; luego contrastar pacientes externos y disponibilidad real de señales.
+
+Referencias: [README de entrega](README.md), [guía de cada prueba](experimentos-hiperparametros.md), [ADR de evaluación](../adr/0011-modelado-posterior-a-la-entrega-etl.md), [ADR de balanceo](../adr/0009-distribuciones-y-desbalance-de-etapas.md).
