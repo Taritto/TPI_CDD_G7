@@ -7,7 +7,7 @@ date: 2026-09-29
 
 ## Implementación vigente
 
-La entrega 2 comprende preparación, análisis y copia candidata. El [notebook autónomo de entrega 3](../../temporal_version_tp_entrega03.ipynb) implementa el flujo de modelado. La referencia anterior se preservó con código/salidas. Se amplió la decisión a dos escenarios: personas nuevas y futuras lecturas de pacientes conocidos. Estado de ejecución y candidatos en [entrega 3](../entrega-03/README.md); test final pendiente.
+La entrega 2 comprende preparación, análisis y copia candidata. El [notebook autónomo de entrega 3](../../temporal_version_tp_entrega03.ipynb) implementa el flujo de modelado. La referencia anterior se preservó con código/salidas. Se amplió la decisión a dos escenarios: personas nuevas y futuras lecturas de pacientes conocidos. Se congeló y evaluó una vez el candidato para personas nuevas; la prueba temporal independiente de pacientes conocidos sigue pendiente. Estado y resultados en [entrega 3](../entrega-03/README.md).
 
 ## Decisión y motivo
 
@@ -21,7 +21,7 @@ El escenario conocido presupone observaciones pasadas etiquetadas disponibles pa
 
 Contexto temporal: señales anteriores del mismo paciente y segmento continuo, nunca etiquetas reales previas ni datos futuros. Historia ausente se conserva como NaN con indicador de disponibilidad; imputación aprendida dentro del entrenamiento. SMOTE se prueba por separado y únicamente dentro del entrenamiento. Reglas de balanceo en [ADR 0009](0009-distribuciones-y-desbalance-de-etapas.md).
 
-El test interno tuvo exposición en EDA y comparaciones previas: declarar esta limitación. Congelar configuración, reentrenar con todo desarrollo y evaluar sin reajuste posterior. Guardar marcador de apertura para evitar repetir inadvertidamente. Pacientes adicionales futuros permitirán evaluación externa separada. Detalle operativo en el README de entrega 3.
+El test interno tuvo exposición en EDA y comparaciones previas: declarar esta limitación. Congelar configuración, reentrenar con todo desarrollo y evaluar sin reajuste posterior. Guardar marcador persistente con estados reservado/abierto/evaluado: un estado incompleto bloquea reintentos automáticos; resultados completos se verifican mediante huellas y se leen sin entrenar ni inferir de nuevo. Persistir probabilidades y clases antes de calcular métricas, que se reconstruyen desde ese archivo. Guardar pipeline con imputación y modelo, comprobar serialización en desarrollo y conservar configuración/columnas/versiones congeladas. Pacientes adicionales futuros permitirán evaluación externa separada. Detalle operativo en el README de entrega 3.
 
 ## Alternativas y criterio de comparación
 

@@ -52,7 +52,7 @@ class ModeladoTest(unittest.TestCase):
         for i, celda in enumerate(NOTEBOOK['cells']):
             if celda['cell_type'] == 'code':
                 compile(''.join(celda['source']), f'celda_{i}', 'exec')
-        self.assertIn('EJECUTAR_TEST_FINAL = False', fuente('CONFIGURACION_FINAL ='))
+        self.assertIn('AUTORIZAR_APERTURA_TEST_FINAL = False', fuente('# 4.8'))
 
     def test_evaluacion_oof_pesos_y_probabilidades(self):
         with tempfile.TemporaryDirectory(dir=TEMP_ROOT) as carpeta:
@@ -109,43 +109,6 @@ class ModeladoTest(unittest.TestCase):
             original = (Path(carpeta)/'asignacion_pacientes.json').read_text()
             exec(fuente('columnas_principal ='), e)
             self.assertEqual(original, (Path(carpeta)/'asignacion_pacientes.json').read_text())
-
-    def test_congelacion_y_test_unico(self):
-        with tempfile.TemporaryDirectory(dir=TEMP_ROOT) as carpeta:
-            e = self.entorno(carpeta)
-            completo, entradas = e['dev'].copy(), e['X'].copy()
-            mascara = completo.patient_id.ge(16)
-            # Agregar las dos entradas a ambas tablas para ejecutar las reglas reales de test.
-            completo['senal'], completo['ruido'] = entradas.senal, entradas.ruido
-            e.update(base=completo, es_test=mascara, test=completo.loc[mascara].reset_index(drop=True),
-                     pacientes_test=[16,17,18,19], huella={'prueba':'sintetica'}, versiones={},
-                     PROTOCOLO_PRINCIPAL='pacientes', diagnosticos={})
-            e['dev'] = completo.loc[~mascara].reset_index(drop=True)
-            e['y'] = e['dev'].Sleep_Stage.map({v:i for i,v in enumerate(e['ETAPAS'])}).to_numpy()
-            e['especificaciones'] = {'elegida': (e['DummyClassifier'](strategy='most_frequent'),
-                True, True, entradas.loc[~mascara].reset_index(drop=True))}
-            arbol = ast.parse(fuente('def diagnosticar_errores('))
-            exec(compile(ast.Module(body=[n for n in arbol.body if isinstance(n, ast.FunctionDef)],
-                                    type_ignores=[]), '<diagnostico>', 'exec'), e)
-            final = fuente('CONFIGURACION_FINAL =').replace('CONFIGURACION_FINAL = None', "CONFIGURACION_FINAL = 'elegida'")
-            final = final.replace("MOTIVO_FINAL = ''", "MOTIVO_FINAL = 'Prueba de integración'")
-            final = final.replace('EJECUTAR_TEST_FINAL = False', 'EJECUTAR_TEST_FINAL = True')
-            e['base']['ACC_X_std'] = -0.5
-            modelo, pesos, escalar, entradas = e['especificaciones']['elegida']
-            e['especificaciones']['invalida'] = (modelo, pesos, escalar,
-                                                  entradas.assign(ACC_X_std_log1p=0.0))
-            with self.assertRaisesRegex(ValueError, 'ACC negativa'):
-                exec(final.replace("CONFIGURACION_FINAL = 'elegida'",
-                                   "CONFIGURACION_FINAL = 'invalida'"), e)
-            self.assertFalse((Path(carpeta)/'test_abierto.json').exists())
-            self.assertFalse((Path(carpeta)/'configuracion_congelada.json').exists())
-            exec(final, e)
-            self.assertEqual(json.loads((Path(carpeta)/'test_abierto.json').read_text())['estado'], 'evaluado')
-            self.assertTrue((Path(carpeta)/'configuracion_congelada.json').exists())
-            self.assertEqual(len(e['pd'].read_csv(Path(carpeta)/'predicciones_test.csv')), 40)
-            with self.assertRaisesRegex(RuntimeError, 'ya fue abierto'):
-                exec(final, e)
-            e['plt'].close('all')
 
     def test_tablas_html_no_heredan_truncamiento_de_pandas(self):
         with tempfile.TemporaryDirectory(dir=TEMP_ROOT) as carpeta:

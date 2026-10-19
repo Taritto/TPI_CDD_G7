@@ -180,7 +180,7 @@ Efecto frente al ganador base sobre las etapas minoritarias:
 | N1 | -0.0001 | -0.0005 | 0.0000 |
 | N3 | 0.0357 | 0.0513 | 0.0429 |
 
-## Candidatos y decisión provisional
+## Selección de desarrollo y decisión
 
 | Escenario | Candidato | F1 base | F1 candidato | Desviación | Exactitud | Brecha | Entrenamiento 5 folds (s) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -236,13 +236,44 @@ F1 macro da igual peso a las cinco etapas; exactitud refleja todos los aciertos 
 
 PR muestra precisión frente a recuperación y AP resume su curva; prevalencia es la referencia. ROC-AUC mide separación frente al resto, pero un AUC alto no garantiza precisión útil para una etapa rara. Matrices identifican confusiones concretas; el análisis por paciente muestra heterogeneidad oculta por promedios. Las figuras completas están en 4.6 del notebook.
 
+## Evaluación final · configuración congelada
+
+Se reentrenó únicamente el ganador para personas nuevas con todo desarrollo (45.011 epochs/60 pacientes). Se aprendieron allí los pesos y medianas; no se utilizó test para entrenar, detener, seleccionar ni ajustar umbrales. La configuración, fuentes, partición y versiones se guardaron antes de obtener métricas del test. El pipeline se guardó y cargó, comprobando igualdad de probabilidades en una muestra de desarrollo; luego realizó una única inferencia sobre test.
+
+| Evaluación | F1 macro | Exactitud |
+| --- | --- | --- |
+| Validación por pacientes: media de cinco folds | 0.5053 | 0.6043 |
+| Test: agregado de 16 personas nuevas | 0.5412 | 0.6126 |
+
+El test obtuvo F1 macro **0.5412** y exactitud **0.6126** en 11.839 epochs de 16 pacientes. La diferencia frente a la media de validación es +0.0358. La cifra global mayor no prueba superioridad ni estabilidad universal: cambian las personas, la distribución y la cantidad de datos usada para entrenar. No se reajustaron parámetros, señales ni umbrales con este resultado.
+
+| Etapa | Precisión | Recuperación | F1 | Soporte |
+| --- | --- | --- | --- | --- |
+| W | 0.6597 | 0.5633 | 0.6077 | 2842 |
+| N1 | 0.1733 | 0.2958 | 0.2185 | 1224 |
+| N2 | 0.8708 | 0.6801 | 0.7637 | 6076 |
+| N3 | 0.6023 | 0.5653 | 0.5832 | 375 |
+| R | 0.4245 | 0.7148 | 0.5327 | 1322 |
+
+**N1 sigue siendo la principal debilidad:** precisión 0.1733, recuperación 0.2958, F1 0.2185, AP 0.1699. Aproximadamente el 82.7 % de las detecciones N1 son falsas y se omite una proporción importante de sus casos reales. El resultado no justifica afirmar buen reconocimiento de todas las etapas.
+
+F1 por paciente, usando cinco clases fijas: mínimo 0.1913, máximo 0.6369. 11 de los 16 pacientes no tienen las cinco etapas observadas; esa cobertura limita comparaciones individuales. La heterogeneidad y los errores de N1 siguen siendo límites relevantes.
+
+En N3, ROC-AUC 0.9746, AP 0.6036 y precisión 0.6023: AUC alto no implica detecciones casi siempre correctas. Las matrices, PR, ROC y los 16 pacientes se muestran en apartados separados de 4.8.
+
+**Decisión:** conservar el modelo evaluado como resultado de esta ronda. El F1 global supera la media de validación, pero no corresponde afirmar rendimiento uniforme ni buen reconocimiento de N1. No se modificaron parámetros, predictores ni umbrales después del test. La evaluación externa sigue siendo necesaria para estudiar generalización fuera de esta cohorte.
+
+**Uso posterior:** cargar `output/modelado/test_final/pipeline.joblib` y construir las mismas 68 columnas, con señales actuales e historia opcional de 1+2 minutos. Antecedentes ausentes se indican y completan con las medianas ya aprendidas; no se recalculan con datos nuevos. El archivo UBJ contiene solo XGBoost, no la imputación.
+
+**Verificación:** 19 pruebas de integración; 4.8 completo probado en kernel limpio sintético; evaluación real en otro kernel limpio; relectura en una sesión nueva con entrenamiento/inferencia bloqueados. Coinciden las huellas de las secciones anteriores, exportaciones y ANTERIOR. Predicciones únicas y resultados protegidos mediante hashes; una ejecución posterior lee los archivos sin reabrir el test.
+
 ## Límites y próximos pasos
 
 - Las configuraciones se seleccionaron usando validación repetidamente; el mayor F1 observado puede ser optimista. Diferencias pequeñas no prueban superioridad estadística y desviación entre folds no es intervalo de confianza.
-- El test reservado permanece cerrado y la configuración final no está congelada. Tuvo exposición histórica en EDA/comparaciones anteriores: no presentarlo como históricamente intacto.
+- La configuración para personas nuevas se congeló y el test fue evaluado una vez. Tuvo exposición histórica en EDA/comparaciones anteriores: no presentarlo como históricamente intacto.
 - El test por pacientes nuevos evalúa ese escenario. Para pacientes conocidos falta una evaluación temporal independiente de la selección. No promediar validación y test ni ajustar después de consultar la prueba final.
 - Los datos son wearable + PSG; solo wearable sigue pendiente. También quedan combinaciones de hiperparámetros, SMOTE+historia y evaluación externa con pacientes adicionales.
-- Próxima decisión: revisar la ganancia, debilidades y costo de cada candidato; congelar características, preprocesamiento, algoritmo e hiperparámetros para personas nuevas antes de abrir el test una vez.
+- Decisión actual: conservar la configuración evaluada, con sus debilidades explícitas. Siguiente evaluación: pacientes externos; futuras mejoras requieren otra evaluación independiente, sin optimizar sobre este test.
 
 ## Guion breve para exponer
 
@@ -250,7 +281,7 @@ PR muestra precisión frente a recuperación y AP resume su curva; prevalencia e
 2. **Método:** preservar antecedentes, reservar pacientes para test y comparar referencias, pesos, parámetros y representaciones dentro de desarrollo.
 3. **Hallazgo metodológico:** mezclar epochs produce cifras diferentes de evaluar personas nuevas o futuro cronológico; responden preguntas distintas.
 4. **Experimentos:** señales pasadas y SMOTE se midieron por separado sobre los mejores modelos base, manteniendo referencias explícitas y sin etiquetas previas.
-5. **Decisión:** presentar un candidato por escenario con F1, etapas débiles y costo; no afirmar que es universalmente mejor ni que ya superó una prueba independiente.
-6. **Cierre:** congelar y evaluar sin reajustes sobre test; luego contrastar pacientes externos y disponibilidad real de señales.
+5. **Decisión:** congelar XGBoost ponderado con historia 1+2 para personas nuevas; en test F1 0,5412 y exactitud 0,6126. N1 sigue débil y el rendimiento varía entre personas; el escenario conocido conserva su validación, sin prueba independiente.
+6. **Cierre:** el test ya se evaluó sin reajustes. Conservar evidencia y contrastar pacientes externos y disponibilidad real de señales.
 
 Referencias: [README de entrega](README.md), [guía de cada prueba](experimentos-hiperparametros.md), [ADR de evaluación](../adr/0011-modelado-posterior-a-la-entrega-etl.md), [ADR de balanceo](../adr/0009-distribuciones-y-desbalance-de-etapas.md).

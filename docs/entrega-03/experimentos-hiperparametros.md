@@ -1558,4 +1558,21 @@ Contra el ganador base `temporal_representacion_XGB_candidata` (F1 0.5567), ΔF1
 - **Personas nuevas:** XGBoost, n_estimators=200, max_depth=4, learning_rate=0.1, min_child_weight=predeterminado, reg_lambda=5, subsample=0.8, colsample_bytree=0.8; con pesos; 68 predictores; historia 1+2 minutos; imputación por fold.
 - **Pacientes conocidos: lecturas futuras:** XGBoost, n_estimators=200, max_depth=6, learning_rate=0.1, min_child_weight=predeterminado, reg_lambda=predeterminado, subsample=0.8, colsample_bytree=0.8; con pesos; 68 predictores; historia 1+2 minutos; imputación por fold.
 
-La selección es provisional. Ver [informe para decisiones y exposición](informe-modelado.md). Importancia: promedio de permutaciones en validación y desviación entre folds; no causalidad. Curvas/matrices acumuladas no equivalen a promedios de folds. Test cerrado; quedan pendientes congelación, prueba independiente, wearable, combinaciones de hiperparámetros y SMOTE+historia.
+La tabla conserva la selección de desarrollo. Para personas nuevas se congeló el candidato y luego se evaluó test, sin nuevos ajustes; ver cierre siguiente. El candidato cronológico sigue pendiente de una prueba independiente. Importancia: promedio de permutaciones en validación y desviación entre folds; no causalidad. Curvas/matrices acumuladas no equivalen a promedios de folds.
+
+## Evaluación final del candidato congelado
+
+Esta evaluación es posterior a los 147 contrastes de desarrollo; no es otra búsqueda de parámetros. Se conservaron sus resultados y se reentrenó únicamente XGBoost ponderado, profundidad 4, lambda 5, historia 1+2 minutos y 68 entradas, con todo desarrollo. La configuración quedó congelada antes de abrir test.
+
+| Evaluación | F1 macro | Exactitud |
+| --- | --- | --- |
+| Validación por pacientes: media de cinco folds | 0.5053 | 0.6043 |
+| Test: agregado de 16 personas nuevas | 0.5412 | 0.6126 |
+
+El test obtuvo F1 macro **0.5412** y exactitud **0.6126** en 11.839 epochs de 16 pacientes. La diferencia frente a la media de validación es +0.0358. La cifra global mayor no prueba superioridad ni estabilidad universal: cambian las personas, la distribución y la cantidad de datos usada para entrenar. No se reajustaron parámetros, señales ni umbrales con este resultado.
+
+**N1 sigue siendo la principal debilidad:** precisión 0.1733, recuperación 0.2958, F1 0.2185, AP 0.1699. Aproximadamente el 82.7 % de las detecciones N1 son falsas y se omite una proporción importante de sus casos reales. El resultado no justifica afirmar buen reconocimiento de todas las etapas.
+
+**Conclusión y decisión:** conservar el modelo como resultado evaluado de esta ronda, con limitaciones por etapa y paciente. El mayor F1 global no demuestra superioridad estadística ni elimina la debilidad de N1. No realizar nuevas elecciones usando este test. La prueba temporal independiente, solo wearable y evaluación externa siguen pendientes; otras combinaciones requieren un nuevo ciclo con evaluación propia.
+
+El detalle final y el guion para exposición están en el [informe](informe-modelado.md). Modelo y predicciones persistidos, lectura posterior protegida; ANTERIOR y las secciones previas permanecen intactos.
