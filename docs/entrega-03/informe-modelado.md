@@ -1,6 +1,130 @@
-# Informe de modelado · decisiones y exposición
+# Informe de modelado · revisión, decisiones y exposición
 
-> **Referencia del notebook oficial previo.** Este documento conserva resultados y decisiones de esa versión. La copia de revisión está implementada pero pendiente de ejecución completa; consultar el [estado vigente](README.md). Las menciones de evaluación cronológica, solo wearable o pendientes antiguos describen ese estado anterior y no forman parte del alcance de la revisión.
+## Problema y método
+
+Clasificar epochs actuales de 30 segundos en cinco etapas del sueño utilizando wearable + PSG. Se consumen CSV preparados, sin repetir EDA/ETL. Se conserva una cohorte de desarrollo de 60 pacientes y una reserva histórica de 16; identidad, tiempo y etiquetas no entran como predictores. Los antecedentes incluyen señales anteriores, nunca etiquetas.
+
+Se selecciona un candidato por pacientes separados y otro por epochs mezclados, con cinco folds y el mismo catálogo acotado. Separar pacientes estima generalización entre personas; mezclar permite compartir sujetos y observaciones próximas. Se necesita un conjunto común fuera de entrenamiento para contrastar los candidatos, no comparar directamente sus F1 de validación.
+
+## Qué cambió respecto del estado recibido
+
+La revisión recibida contenía salidas de Kaggle hasta 4.5.2, con 16 variantes individuales. Se completaron historia, balanceo, selección y diagnósticos sin ampliar hiperparámetros ni combinar historia con SMOTE. Se reemplazó la exigencia de CSV de pacientes adicionales por evaluación sobre los 16 pacientes ya reservados. El notebook oficial y el código/salidas de 4.8 permanecen como evidencia histórica.
+
+El desarrollo nuevo se ejecutó desde un kernel limpio con `N_JOBS=-1`, CPU, semilla 42 y versiones registradas. No estaban disponibles las exportaciones completas de Kaggle de 4.1–4.5.2, por lo que se repitieron los bloques necesarios en vez de reconstruir predicciones desde tablas. Las salidas recibidas de Kaggle (`N_JOBS=2`) se conservaron como evidencia anterior; sus tiempos no son comparables directamente con esta ejecución. Los registros `ejecuciones.jsonl` distinguen entrenamiento ejecutado y reutilización compatible.
+
+Antes de predecir el test, la comprobación binaria de serialización de RF detectó diferencias de redondeo de aproximadamente 3,3 × 10⁻¹⁶, sin cambiar clases. Se corrigió el control a tolerancia 10⁻¹² con clases idénticas y se agregó una prueba de regresión. Se conservó el estado interrumpido y se completó 4.7 en otro kernel limpio desde los dos pipelines guardados y verificados, sin reentrenarlos ni repetir predicciones de test. La continuación preapertura quedó auditada; el flujo normal sigue bloqueando estados incompletos. Los tiempos exactos de ese entrenamiento final no se habían persistido antes de la interrupción y se muestran ausentes, sin estimarlos. Sí están disponibles los costos de entrenamiento de validación y los tiempos reales de inferencia.
+
+Las nuevas salidas viven en `output/modelado_revision/`. Los artefactos de comparación están en `comparacion_test/`: configuraciones congeladas, pipelines, pruebas de serialización, predicciones únicas, métricas, diagnósticos y diferencias por paciente. El notebook oficial y el código/salidas históricos de 4.8 se preservaron. No se ejecutó 4.8.
+
+## Selección y resultados
+
+| Selección | Algoritmo | Pesos | Historia (min) | Entradas | F1 validación ± DE | F1 test | Exactitud test |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Pacientes separados | XGB | Sí | [1, 2] | 68 | 0,5053 ± 0,0265 | 0,5412 | 0,6126 |
+| Epochs mezclados | RF | No | Sin historia | 22 | 0,8006 ± 0,0038 | 0,4985 | 0,6278 |
+
+- **Pacientes separados:** `contexto_pacientes_XGB_lag_1+2`; `n_estimators=200`, `max_depth=4`, `learning_rate=0.1`, `reg_lambda=5`, `min_child_weight=None`, `subsample=0.8`, `colsample_bytree=0.8`; representación `candidata`; pesos balanceados; retardos [1, 2]; SMOTE `None`; 68 entradas. Las opciones predeterminadas se registran en la configuración congelada.
+- **Epochs mezclados:** `smote_epochs_RF_ratio1.0_k5`; `n_estimators=200`, `max_depth=None`, `min_samples_leaf=2`, `max_features=sqrt`; representación `candidata`; pesos desactivados; retardos []; SMOTE `{'ratio': 1.0, 'k': 5}`; 22 entradas. Las opciones predeterminadas se registran en la configuración congelada.
+
+### Contexto y balanceo
+
+| Protocolo | Prueba | Mejor variante observada | F1 referencia | F1 variante | Diferencia | Brecha | Entrenamiento 5 folds (s) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Pacientes separados | Contexto temporal | Historia 1+2 minutos (dos mejores individuales) | 0,4907 | 0,5053 | 0,0147 | 0,3010 | 12,1839 |
+| Pacientes separados | SMOTE | SMOTE objetivo 100% de mayoritaria; k=3 | 0,4451 | 0,4860 | 0,0409 | 0,2911 | 12,7084 |
+| Epochs mezclados | Contexto temporal | Historia 15 minutos | 0,7860 | 0,7888 | 0,0029 | 0,1777 | 13,6455 |
+| Epochs mezclados | SMOTE | SMOTE objetivo 100% de mayoritaria; k=5 | 0,7645 | 0,8006 | 0,0360 | 0,1947 | 38,1493 |
+
+La referencia de SMOTE en la tabla es el control escalado sin pesos. Frente al control ponderado:
+
+- **Pacientes separados:** mejor SMOTE 0,4860; control ponderado sin historia 0,4491; diferencia SMOTE menos ponderado 0,0369.
+- **Epochs mezclados:** mejor SMOTE 0,8006; control ponderado sin historia 0,7617; diferencia SMOTE menos ponderado 0,0388.
+
+La historia se construye dentro de paciente y segmento continuo; discontinuidades reinician antecedentes. Los faltantes se conservan como NaN e indicadores e imputan con medianas aprendidas en entrenamiento. SMOTE se aplica solo a entrenamiento, con control escalado; las métricas de entrenamiento se miden sobre filas reales. Más dimensiones, más ejemplos sintéticos o menor brecha no garantizan mayor F1.
+
+La [guía](experimentos-hiperparametros.md) presenta para cada prueba la referencia, diferencias, tiempos, etapas y conclusión; no es una búsqueda exhaustiva ni una prueba de optimalidad.
+
+## Comparación sobre el mismo test
+
+En los mismos 16 pacientes, el candidato seleccionado mediante **pacientes separados** obtuvo el mayor F1 macro. Diferencia epochs menos pacientes: **-0,0426**. Las validaciones no se comparan como si midieran generalización equivalente. La diferencia en test corresponde a estos candidatos concretos; pueden cambiar algoritmo, entradas y parámetros además del protocolo. No se realizaron reajustes posteriores.
+
+| Etapa | Pacientes separados: F1 test | Epochs mezclados: F1 test |
+| --- | --- | --- |
+| W | 0,6077 | 0,6188 |
+| N1 | 0,2185 | 0,2048 |
+| N2 | 0,7637 | 0,7819 |
+| N3 | 0,5832 | 0,3734 |
+| REM | 0,5327 | 0,5138 |
+
+- **Pacientes separados:** menor F1 en N1: 0,2185, precisión 0,1733, recuperación 0,2958. F1 individual entre 0,1913 y 0,6369; 11/16 personas sin las cinco etapas observadas. No afirmar buen reconocimiento uniforme.
+- **Epochs mezclados:** menor F1 en N1: 0,2048, precisión 0,1789, recuperación 0,2394. F1 individual entre 0,2137 y 0,5493; 11/16 personas sin las cinco etapas observadas. No afirmar buen reconocimiento uniforme.
+
+El candidato de epochs mezclados supera al de pacientes en 6 de los 16 F1 individuales, calculados sobre cinco clases fijas. Etapas ausentes y distintas duraciones limitan la comparación. El agregado por epoch da más peso a registros largos. Revisar las tablas por paciente y matrices en 4.7, no solo el promedio global.
+
+Los gráficos ROC complementan precisión/recuperación; una ROC-AUC alta puede coexistir con mala precisión de una etapa escasa. La importancia de los mejores RF/XGBoost base se conserva y se añadió un análisis específico del XGBoost final de 68 entradas. Ambos miden caída de F1 en validación; no demuestran causalidad.
+
+## Interpretación del XGBoost final con historia
+
+Se mantuvo la configuración congelada XGBoost ponderada con historia 1+2 minutos y sus 68 entradas. Se reentrenó exclusivamente en los cinco folds por pacientes de desarrollo, con imputación y pesos aprendidos en entrenamiento. Cinco permutaciones por variable y por grupo dentro de cada validación; primero se promedian repeticiones por fold y después los cinco folds con igual peso. El F1 base medio fue 0,5053, coherente con la selección ya guardada. No se ejecutó ni se volvió a predecir el test.
+
+| Grupo permutado conjuntamente | Columnas | Caída media de F1 macro | Desviación entre folds |
+| --- | --- | --- | --- |
+| Actuales | 22 | 0,2306 | 0,0244 |
+| Hace 1 minuto | 22 | 0,0476 | 0,0258 |
+| Hace 2 minutos | 22 | 0,0218 | 0,0307 |
+| Disponibilidad | 2 | 0,0006 | 0,0003 |
+
+La mayor caída media correspondió al grupo **actuales** (0,2306). Los antecedentes de un minuto y dos minutos tuvieron caídas medias 0,0476 y 0,0218; describen dependencia del modelo, no una mejora garantizada al agregarlos. Los indicadores de disponibilidad tuvieron caída media 0,0006. Las desviaciones reflejan variación entre folds; no constituyen una prueba estadística de superioridad entre grupos.
+
+Entradas individuales destacadas: `EOG_max_std`, `C4-M1_std`, `CHIN_std`, `F4-M1_std`, `CZ - T4_std`. El notebook muestra las 20 mayores caídas medias por color de grupo y exporta las 68. Primeras ocho:
+
+| Entrada | Grupo | Caída media de F1 macro | Desviación entre folds |
+| --- | --- | --- | --- |
+| EOG_max_std | Actuales | 0,0353 | 0,0144 |
+| C4-M1_std | Actuales | 0,0266 | 0,0243 |
+| CHIN_std | Actuales | 0,0243 | 0,0223 |
+| F4-M1_std | Actuales | 0,0216 | 0,0214 |
+| CZ - T4_std | Actuales | 0,0188 | 0,0320 |
+| T3 - CZ_std | Actuales | 0,0105 | 0,0133 |
+| ACC_axes_std_norm_log1p | Actuales | 0,0083 | 0,0023 |
+| O2-M1_std | Actuales | 0,0069 | 0,0058 |
+
+La importancia conjunta se calcula permutando todas las columnas de un grupo con el mismo orden de filas y dejando las demás intactas. **No es la suma de importancias individuales ni un porcentaje causal**; los grupos tienen tamaños diferentes. La correlación puede repartir u ocultar información, y las permutaciones pueden generar combinaciones poco habituales. Una caída negativa no garantiza mejorar al quitar una entrada. Estos resultados no cambian columnas, parámetros ni candidatos.
+
+Las exportaciones están en `output/modelado_revision/interpretacion_xgb_historia/`: permutaciones completas, medias por fold, tablas individuales/grupales, medianas y pesos de entrenamiento, métricas base, trazabilidad y dos gráficos. Una ejecución completa se verifica y relee sin entrenar; una incompleta se conserva y bloquea sobrescrituras.
+
+## Lectura de la decisión final
+
+XGBoost obtuvo F1 macro de test 0,5412 frente a 0,4985 de RF, aunque RF tuvo mayor exactitud (0,6278 frente a 0,6126). La validación por pacientes ya exigía predecir personas excluidas del entrenamiento; mezclar epochs permitía compartir personas y observaciones próximas. Esa diferencia ayuda a entender por qué la validación mezclada fue más favorable, pero no demuestra que el protocolo sea la única causa del resultado: también cambiaron algoritmo, regularización, ponderación, historia y SMOTE. La importancia describe al XGBoost, no prueba por qué superó a RF.
+
+N1 sigue siendo débil: F1 0,2185, precisión 0,1733 y recuperación 0,2958. El F1 por persona varía entre 0,1913 y 0,6369; la cobertura de etapas limita comparaciones individuales. El test tuvo exposición histórica y no constituye una nueva evaluación independiente.
+
+
+## Límites y decisiones
+
+El test ya había sido consultado y tuvo exposición histórica en EDA/comparaciones de la cohorte completa. Esta es una comparación posterior sobre personas excluidas de los nuevos entrenamientos, **no una nueva prueba independiente**. No se usó para seleccionar ni reajustar los candidatos de esta ronda. La selección entre muchas pruebas puede optimizar en exceso la validación.
+
+Al mezclar epochs se comparten personas y observaciones próximas. Con historia, un antecedente puede contener señales de otro fold; no contiene su etiqueta, pero la dependencia puede favorecer las métricas. Las etapas ausentes y las distintas duraciones limitan comparaciones individuales. Los modelos utilizan wearable + PSG; no demuestran rendimiento solo wearable.
+
+Se conservan ambos candidatos y sus resultados; no se reemplaza ni se reajusta automáticamente el pipeline histórico. El F1 histórico 0,5412 de 4.8 pertenece a otra selección y ejecución, aunque use los mismos 16 pacientes. Una evaluación externa con personas adicionales sería una ampliación futura y requeriría entradas compatibles; no es necesaria para consultar los resultados actuales.
+
+## Síntesis para exposición
+
+1. **Problema:** reconocer cinco etapas del sueño en epochs de 30 segundos con wearable + PSG.
+2. **Metodología:** dos estrategias de selección, mismas fuentes de desarrollo y mismo catálogo, con pesos, representación, historia y SMOTE controlados.
+3. **Evidencia:** comparar ambos candidatos congelados sobre los mismos 16 pacientes fuera de entrenamiento; mostrar F1 macro y errores por etapa/persona.
+4. **Interpretación:** las señales actuales y los antecedentes se analizan mediante importancia individual y conjunta en validación; no se usan para reajustar el modelo.
+5. **Decisión observada:** En los mismos 16 pacientes, el candidato seleccionado mediante **pacientes separados** obtuvo el mayor F1 macro. Diferencia epochs menos pacientes: **-0,0426**. Las validaciones no se comparan como si midieran generalización equivalente. La diferencia en test corresponde a estos candidatos concretos; pueden cambiar algoritmo, entradas y parámetros además del protocolo. No se realizaron reajustes posteriores.
+6. **Límites:** test históricamente consultado, validación mezclada dependiente y heterogeneidad por paciente. No afirmar que un protocolo sea universalmente superior.
+7. **Continuidad:** ronda actual terminada; nuevos experimentos necesitarían otra justificación y evaluación, sin reajustar a partir de este test.
+
+## Evidencia histórica · informe previo
+
+El contenido siguiente conserva el recorrido y los resultados anteriores; los pendientes y protocolos antiguos no describen el alcance activo.
+
+
+
+El contenido siguiente conserva el recorrido y los resultados anteriores; los pendientes y protocolos antiguos no describen el alcance activo.
 
 ## Objetivo y alcance
 

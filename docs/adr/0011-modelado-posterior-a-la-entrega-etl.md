@@ -17,7 +17,7 @@ Identificar la etapa del epoch actual de 30 segundos con wearable + PSG. Es clas
 
 Conservar la asignación de aproximadamente 20 % de pacientes al test interno, semilla 42. Estos 16 pacientes ya se evaluaron y no se usan para nuevos ajustes. Dentro de los 60 pacientes de desarrollo, seleccionar un candidato con cinco folds de StratifiedGroupKFold agrupados por patient_id y otro con cinco folds de StratifiedKFold por epochs mezclados. Cada protocolo reutiliza sus propias particiones y el mismo catálogo de alternativas.
 
-Solo pacientes separados garantiza que el modelo de cada fold no entrenó con esa persona. Epochs mezclados puede compartir sujetos y observaciones próximas: sus cifras no demuestran mejor generalización a pacientes nuevos. Se conservan ambos candidatos para compararlos sobre las mismas personas adicionales, fijando las configuraciones antes de acceder a esas nuevas etiquetas. La comparación contrasta candidatos concretos; no demuestra superioridad universal de un protocolo.
+Solo pacientes separados garantiza que el modelo de cada fold no entrenó con esa persona. Epochs mezclados puede compartir sujetos y observaciones próximas: sus cifras no demuestran mejor generalización a pacientes nuevos. Se conservan ambos candidatos para compararlos sobre los mismos 16 pacientes del test reservado, fijando las configuraciones antes de calcular nuevos resultados. El test ya fue consultado: comparación posterior, no prueba independiente nueva. La comparación contrasta candidatos concretos; no demuestra superioridad universal de un protocolo.
 
 ## Selección, características y balanceo
 
@@ -27,15 +27,22 @@ Contexto temporal: señales pasadas del mismo paciente y segmento continuo, nunc
 
 Escalado, imputación, pesos y SMOTE se ajustan exclusivamente con entrenamiento. SMOTE se estudia sin historia ni pesos adicionales; validación y métricas de entrenamiento se calculan sobre observaciones reales. Reglas de balanceo en [ADR 0009](0009-distribuciones-y-desbalance-de-etapas.md).
 
-## Diagnóstico y prueba adicional
+## Diagnóstico y comparación de test reservado
 
 Guardar una predicción y probabilidades OOF por epoch, configuración y protocolo. Distinguir promedio entre folds de métricas acumuladas. Informar F1 macro, precisión/recuperación/F1 por etapa, matrices, ROC-AUC y resultados por paciente con cobertura de etapas. Retirar Precision–Recall/AP de los diagnósticos activos; las salidas históricas quedan preservadas.
 
-El test interno tuvo exposición en EDA y comparaciones previas: declarar esta limitación. Su evaluación histórica conserva código y resultados, sin reentrenar ni inferir allí. No transferir sus métricas a candidatos nuevos.
+El test interno tuvo exposición en EDA y comparaciones previas: declarar esta limitación. Su evaluación histórica conserva código y resultados, sin reentrenar ni inferir allí. No transferir sus métricas a candidatos nuevos. La nueva comparación se guarda por separado sin sobrescribir artefactos históricos.
 
-La comparación adicional requiere pacientes distintos de la cohorte histórica y CSV procesados con las mismas reglas del ETL. Ambos candidatos se entrenan con los mismos 60 pacientes de desarrollo y se evalúan en las mismas personas nuevas. No se reajusta a partir de esta prueba. Sin esas entradas, la comparación queda pendiente.
+La comparación vigente utiliza los 16 pacientes del test reservado, no pacientes adicionales. Ambos candidatos se congelan tras desarrollo, se entrenan con los mismos 60 pacientes y se evalúan sobre los mismos 11.839 epochs. La reserva no interviene en selección y no se reajusta tras esta comparación. Su exposición histórica impide presentarla como evaluación independiente nueva. La evaluación externa queda únicamente como alternativa futura.
 
-Conservar configuración, columnas, representación, retardos, balanceo, versiones y fuentes. Persistir pipelines, probabilidades y predicciones. Una ejecución adicional incompleta bloquea reintentos automáticos; una completada verifica huellas y se relee sin entrenar ni inferir. Guardar las nuevas exportaciones por separado de las históricas.
+Conservar configuración, columnas, representación, retardos, balanceo, versiones y fuentes. Guardar pipelines y comprobar serialización con desarrollo antes de abrir resultados. Persistir probabilidades y clases una vez por candidato antes de calcular métricas desde archivos. El estado de una comparación incompleta bloquea reintentos; una completa verifica huellas y se relee sin entrenar ni inferir. Las salidas de revisión están separadas de las históricas.
+
+## Interpretación del candidato final
+
+Se conservan las importancias base y se añade XGBoost congelado con historia 1+2 minutos, 68 entradas. Se reentrena únicamente en cinco folds por pacientes de desarrollo, con medianas/pesos de entrenamiento, y se permuta solo validación. Se calculan cinco repeticiones por entrada y por grupo; primero promedio por fold y después media/desviación entre folds.
+
+Los grupos son señales actuales, antecedentes de 1 minuto, antecedentes de 2 minutos e indicadores de disponibilidad. Dentro de cada grupo se usa una única permutación conjunta de filas para conservar relaciones entre sus columnas. Su importancia no es suma de las individuales, no mide causalidad y depende de correlaciones. No se seleccionan características ni se reajusta el modelo después del test. Se recuperan ejemplos históricos de parámetros únicamente con propósito explicativo, distinguiéndolos de nuevas ejecuciones.
+
 
 ## Alternativas y consecuencias
 
@@ -43,7 +50,7 @@ Una división única por paciente es más económica, pero depende más de las p
 
 La evaluación cronológica respondía al uso de pasado etiquetado para predecir períodos futuros del mismo paciente. Se retiró del alcance activo por decisión del equipo, conservando sus versiones anteriores en Git. Los retardos de señales siguen disponibles y no implican realizar ese protocolo de evaluación.
 
-La selección sobre muchos candidatos puede optimizar en exceso los mismos folds; las diferencias pequeñas no prueban superioridad concluyente. La comparación adicional amplía la evidencia y debe reportar ambos resultados, incluso si el candidato seleccionado con epochs mezclados no mantiene su ventaja de validación.
+La selección sobre muchos candidatos puede optimizar en exceso los mismos folds; las diferencias pequeñas no prueban superioridad concluyente. La comparación sobre el test histórico amplía la evidencia descriptiva y debe reportar ambos resultados, incluso si el candidato seleccionado con epochs mezclados no mantiene su ventaja de validación.
 
 ## Alcance
 

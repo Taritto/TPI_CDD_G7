@@ -1,33 +1,55 @@
 # Entrega 3 · Modelado y evaluación
 
-## Estado y alcance
+## Estado y resultado
 
-La [copia de revisión](../../temporal_version_tp_entrega03_revision.ipynb) contiene las salidas de Kaggle **hasta 4.5.2; la ejecución desde 4.5.3 está pendiente**. El [notebook oficial previo](../../temporal_version_tp_entrega03.ipynb) queda intacto para que el equipo compare ambos antes de consolidar la revisión.
+La [revisión](../../temporal_version_tp_entrega03_revision.ipynb) tiene ejecutadas las secciones activas **4.1–4.7**: selección, historia, SMOTE, diagnósticos y comparación sobre los mismos **16 pacientes de test reservado**. No requiere pacientes adicionales. El [notebook oficial](../../temporal_version_tp_entrega03.ipynb) y su evaluación histórica se conservan.
 
-Se clasifica el epoch actual de 30 segundos con wearable + PSG. Se seleccionará un candidato con pacientes separados y otro con epochs mezclados, usando el mismo catálogo de alternativas sobre 45.011 epochs de 60 pacientes. Los 16 pacientes ya evaluados históricamente quedan fuera de los nuevos ajustes.
+Desarrollo: 45.011 epochs / 60 pacientes; test: 11.839 epochs / 16 personas distintas. Se seleccionó un candidato por protocolo usando el mismo catálogo acotado y sus cinco folds. La búsqueda no determina hiperparámetros óptimos.
 
-Las salidas incorporadas corresponden a 16 configuraciones nuevas de hiperparámetros de RF/XGBoost, con y sin pesos y en ambos protocolos; logística queda como referencia sin ajustar C. Se ejecutaron con `N_JOBS=2`. Se conserva `N_JOBS=-1` para futuras ejecuciones, según lo acordado: los tiempos guardados pertenecen a la ejecución con dos núcleos. En 4.5.1 se conservaron exactamente las tablas finales de Kaggle: comparación general, sobreajuste, tiempos, F1 por etapa e interpretación de los cambios. Se muestran hasta tres configuraciones por algoritmo. El código muestra solo nombres durante las pruebas y el resumen completo al finalizar, sin las cuatro tablas detalladas de cada configuración. No se reentrenaron modelos ni se recalcularon cifras al incorporar estas salidas.
+| Selección | Algoritmo | Pesos | Historia (min) | Entradas | F1 validación ± DE | F1 test | Exactitud test |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Pacientes separados | XGB | Sí | [1, 2] | 68 | 0,5053 ± 0,0265 | 0,5412 | 0,6126 |
+| Epochs mezclados | RF | No | Sin historia | 22 | 0,8006 ± 0,0038 | 0,4985 | 0,6278 |
 
-La ejecución de representaciones comparó la candidata con canales separados, manteniendo `log1p`. No hay resultados nuevos desde 4.5.3. Las exportaciones locales previas de `output/modelado_revision/` son parciales y no equivalen a esta ejecución de Kaggle.
+En los mismos 16 pacientes, el candidato seleccionado mediante **pacientes separados** obtuvo el mayor F1 macro. Diferencia epochs menos pacientes: **-0,0426**. Las validaciones no se comparan como si midieran generalización equivalente. La diferencia en test corresponde a estos candidatos concretos; pueden cambiar algoritmo, entradas y parámetros además del protocolo. No se realizaron reajustes posteriores.
 
-## Cómo ejecutar la revisión
+## Qué se probó
 
-1. Subir el notebook de revisión a Kaggle con los CSV `dataset_epochs_v1.csv` y `dataset_modelado_candidato.csv` de la misma ejecución del ETL. No hace falta repetir el ETL crudo.
-2. Ejecutar 4.1–4.6 desde un kernel limpio. Los resultados nuevos se guardan en `/kaggle/working/modelado_revision/`. `N_JOBS=-1` permite usar los núcleos de CPU disponibles para RF/XGBoost, como en el original; el código utiliza CPU.
-3. La sección 4.7 tiene preparación/evaluación común y resultados/comparación. Requiere los dos CSV de pacientes adicionales, compatibles con el ETL y de personas distintas de la cohorte histórica. Sin rutas, informa que la comparación está pendiente. No sustituirlos por los 16 pacientes ya consultados.
-4. No ejecutar 4.8: conserva el código y las salidas históricas del notebook original como referencia posterior a la comparación adicional. Son pacientes distintos: no es una comparación directa sobre los mismos casos. Las etiquetas `skip-execution` sirven para ejecución programática y pueden no ser respetadas por Kaggle; seleccionar los bloques activos en lugar de «ejecutar todo».
-5. Compartir el `.ipynb` ejecutado y las exportaciones para interpretar resultados y actualizar únicamente los documentos afectados.
+- Referencias Dummy, logística, RF y XGBoost con/sin pesos.
+- 16 variantes individuales: RF profundidad 16 o mínimo por hoja 10; XGBoost profundidad 2 o lambda 5, con/sin pesos en ambos protocolos. No se amplió el catálogo ni se ajustó C de logística.
+- Representación candidata frente a canales separados, ambas con `log1p`.
+- Historia de 1/2/5/10/15 minutos, 5+10 y los dos mejores individuales, sobre el ganador base de cada protocolo.
+- Controles sin/con pesos y escalado; SMOTE vecinos 3/5 y objetivos 50/100 %, sin historia ni pesos adicionales.
 
-Se retiraron la evaluación cronológica, la propuesta solo wearable y Precision–Recall/AP de los diagnósticos activos. Se conservan historia causal por paciente, matrices, ROC-AUC y resultados por paciente. Las métricas mezcladas no demuestran, por sí solas, generalización a personas nuevas.
+Se documentaron 65 comparaciones contra referencia en esta ronda. [Resumen por sección](resumen-notebook.md), [informe para exponer](informe-modelado.md), [detalle y conclusión de cada prueba](experimentos-hiperparametros.md).
 
-## Evaluación histórica protegida
+## Interpretación final completada
 
-El bloque histórico corresponde al XGBoost con pesos e historia 1+2 minutos, 68 entradas. Sus salidas guardadas muestran F1 macro 0,5412 y exactitud 0,6126 sobre los 16 pacientes. No transferir ese resultado a candidatos nuevos ni reutilizar el test para ajustes. Tuvo exposición histórica en EDA y comparaciones anteriores.
+Se recuperaron seis pruebas históricas de parámetros para explicar regularización, capacidad y costo, sin ampliar búsquedas. Se calcularon las importancias de las 68 entradas del XGBoost final y de cuatro grupos sobre validación de desarrollo; los resultados se muestran en 4.6.1 y en el [informe](informe-modelado.md#interpretación-del-xgboost-final-con-historia).
 
-Las salidas del notebook se conservan exactamente. Los artefactos originales de `output/modelado/` no están disponibles en este checkout; la revisión no los reconstruye ni los sobrescribe. Las nuevas exportaciones están separadas.
+La mayor caída media correspondió al grupo **actuales** (0,2306). Los antecedentes de un minuto y dos minutos tuvieron caídas medias 0,0476 y 0,0218; describen dependencia del modelo, no una mejora garantizada al agregarlos. Los indicadores de disponibilidad tuvieron caída media 0,0006. Las desviaciones reflejan variación entre folds; no constituyen una prueba estadística de superioridad entre grupos.
 
-## Documentación y verificaciones
+Para ejecutar únicamente esta interpretación en un kernel limpio, cargar las definiciones `agregar_historia`, `buscar_csv` y `mostrar_tabla` de 4.1 y ejecutar el nuevo bloque de 4.6.1 con los archivos congelados de revisión. No ejecutar búsquedas ni 4.7/4.8. La interpretación no modifica el modelo evaluado.
 
-El [resumen](resumen-notebook.md) describe la copia de revisión. El [informe](informe-modelado.md) y la [guía de experimentos](experimentos-hiperparametros.md) conservan resultados del notebook oficial previo y se actualizarán con la ejecución completa; no son resultados de la revisión. El [ADR metodológico](../adr/0011-modelado-posterior-a-la-entrega-etl.md) refleja las decisiones aprobadas.
 
-La revisión conserva la huella del notebook de origen en sus metadatos. Se verificó estáticamente la sintaxis, los retiros acordados y la igualdad del código/salidas históricos. Las pruebas de integración de `tests/test_revision_entrega03.py` están preparadas; su verificación final requiere ejecución en un entorno de modelado y no se realizó tras los últimos cambios. No es necesario ejecutar entrenamientos en el Mac para editar el notebook.
+## Ejecución y conservación
+
+El desarrollo nuevo se ejecutó desde un kernel limpio con `N_JOBS=-1`, CPU, semilla 42 y versiones registradas. No estaban disponibles las exportaciones completas de Kaggle de 4.1–4.5.2, por lo que se repitieron los bloques necesarios en vez de reconstruir predicciones desde tablas. Las salidas recibidas de Kaggle (`N_JOBS=2`) se conservaron como evidencia anterior; sus tiempos no son comparables directamente con esta ejecución. Los registros `ejecuciones.jsonl` distinguen entrenamiento ejecutado y reutilización compatible.
+
+Antes de predecir el test, la comprobación binaria de serialización de RF detectó diferencias de redondeo de aproximadamente 3,3 × 10⁻¹⁶, sin cambiar clases. Se corrigió el control a tolerancia 10⁻¹² con clases idénticas y se agregó una prueba de regresión. Se conservó el estado interrumpido y se completó 4.7 en otro kernel limpio desde los dos pipelines guardados y verificados, sin reentrenarlos ni repetir predicciones de test. La continuación preapertura quedó auditada; el flujo normal sigue bloqueando estados incompletos. Los tiempos exactos de ese entrenamiento final no se habían persistido antes de la interrupción y se muestran ausentes, sin estimarlos. Sí están disponibles los costos de entrenamiento de validación y los tiempos reales de inferencia.
+
+Las nuevas salidas viven en `output/modelado_revision/`. Los artefactos de comparación están en `comparacion_test/`: configuraciones congeladas, pipelines, pruebas de serialización, predicciones únicas, métricas, diagnósticos y diferencias por paciente. El notebook oficial y el código/salidas históricos de 4.8 se preservaron. No se ejecutó 4.8.
+
+Para consultar 4.7 con resultados completos, conservar todos sus artefactos y `AUTORIZAR_COMPARACION_TEST=False`: se releen sin entrenar ni inferir. Una apertura incompleta se bloquea y no debe reiniciarse automáticamente. Las configuraciones y columnas deben coincidir. No borrar `comparacion_test/estado.json`.
+
+No ejecutar las celdas de 4.8: sus salidas corresponden al modelo histórico, F1 macro 0,5412 y exactitud 0,6126. Son los mismos 16 pacientes con otra selección y entorno; no transferir esas cifras a los candidatos actuales. Los marcadores `skip-execution` pueden no ser respetados por «ejecutar todo» en Kaggle.
+
+## Límites y verificación
+
+El test ya había sido consultado y tuvo exposición histórica en EDA/comparaciones de la cohorte completa. Esta es una comparación posterior sobre personas excluidas de los nuevos entrenamientos, **no una nueva prueba independiente**. No se usó para seleccionar ni reajustar los candidatos de esta ronda. La selección entre muchas pruebas puede optimizar en exceso la validación.
+
+Al mezclar epochs se comparten personas y observaciones próximas. Con historia, un antecedente puede contener señales de otro fold; no contiene su etiqueta, pero la dependencia puede favorecer las métricas. Las etapas ausentes y las distintas duraciones limitan comparaciones individuales. Los modelos utilizan wearable + PSG; no demuestran rendimiento solo wearable.
+
+Se ejecutaron 29 pruebas sintéticas e integración del flujo revisado (22 existentes y siete de interpretación): historia, faltantes, pesos/SMOTE exclusivos de entrenamiento, serialización, una inferencia de test por candidato, relectura e integridad. La aceptación real verifica OOF, claves, probabilidades y conservación de artefactos anteriores. Las verificaciones disponibles se registran en `output/verificacion/aceptacion_revision_test.json`. El archivo `ANTERIOR` no estaba disponible en este checkout: no se pudo verificar su huella en esta ronda; sí las del notebook oficial y los artefactos históricos disponibles.
+
+Una evaluación externa con personas adicionales sería una ampliación futura, no un requisito para ejecutar esta comparación. No quedan entrenamientos pendientes dentro de esta ronda, incluida la importancia final con historia. [Decisión metodológica](../adr/0011-modelado-posterior-a-la-entrega-etl.md).

@@ -39,9 +39,10 @@ class RevisionTest(base_tests.ModeladoTest):
 
     def test_original_y_bloque_historico_preservados(self):
         evidencia=REVISION['metadata']['revision']
-        self.assertEqual(hashlib.sha256((ROOT/'temporal_version_tp_entrega03.ipynb').read_bytes()).hexdigest(),evidencia['sha256_origen'])
+        self.assertEqual(hashlib.sha256((ROOT/'temporal_version_tp_entrega03.ipynb').read_bytes()).hexdigest(),evidencia['sha256_oficial_al_iniciar'])
         celdas={''.join(c['source']):c for c in REVISION['cells'] if c['cell_type']=='code'}
-        for c in ORIGINAL['cells'][35:49]:
+        for c in ORIGINAL['cells']:
+            if not ''.join(c['source']).startswith(('# 4.8', 'RESULTADO_FINAL =', 'tabla_final(pd.DataFrame', 'mostrar_errores_final(', 'mostrar_curvas_final(', 'PACIENTES_TEST_FINAL =', 'EVOLUCION_FINAL =')): continue
             if c['cell_type']!='code':continue
             nueva=celdas[''.join(c['source'])]
             self.assertEqual(''.join(c['source']),''.join(nueva['source']))
@@ -55,7 +56,8 @@ class RevisionTest(base_tests.ModeladoTest):
         for prohibido in ["folds['temporal']",'particiones_cronologicas','precision_recall_curve','average_precision_score']:
             self.assertNotIn(prohibido,activos)
         self.assertIn("ESCENARIOS = ['pacientes', 'epochs']",activos)
-        self.assertIn('RUTA_BASE_ADICIONAL = None',activos)
+        self.assertIn('AUTORIZAR_COMPARACION_TEST = False',activos)
+        self.assertNotIn('RUTA_BASE_ADICIONAL',activos)
         self.assertIn("'desviacion','segundos_entrenamiento','desempate_nombre'",activos)
 
     def test_cache_evitar_reentrenar_y_rechazar_manipulaciones(self):
@@ -71,72 +73,143 @@ class RevisionTest(base_tests.ModeladoTest):
             with self.assertRaisesRegex(ValueError,'huellas'):
                 e['evaluar'](modelo,e['X'],'tercera','epochs',mostrar_progreso=False)
 
-    def adicional_fixture(self,carpeta):
+    def reservado_fixture(self,carpeta):
         e=self.entorno(carpeta);pd,np=e['pd'],e['np']
         columnas=ast.literal_eval(ast.parse(base_tests.fuente('columnas_principal =')).body[0].value)
         e['columnas_principal']=columnas
         necesarias=set(columnas+['BVP_std','EDA_median','ACC_X_std','ACC_Y_std','ACC_Z_std','E1_std','E2_std','LAT_std','RAT_std'])
         dev=e['dev'].copy()
-        for c in necesarias:dev[c]=np.arange(len(dev))%5+1.
-        e['base']=dev.copy();e['dev']=dev
+        for c in necesarias: dev[c]=np.arange(len(dev))%5+1.
+        test=dev.iloc[:20].copy();test['patient_id']=100+np.repeat([0,1],10)
+        test['HR_median']=10000.
+        e.update(dev=dev,test=test,pacientes_test=[100,101],base=pd.concat([dev,test],ignore_index=True))
         e['X']=dev[columnas]
         cell_functions('def construir_representaciones(',e)
-        cell_functions('# Configurar únicamente',e)
+        cell_functions('# 4.7',e)
         e['planes_candidatos']={};e['candidatos_escenario']={}
         for p in ['pacientes','epochs']:
             nombre=f'{p}_RF_pesos0'
             e['candidatos_escenario'][p]=nombre
-            e['planes_candidatos'][p]=dict(columnas=columnas,retardos=[],representacion='candidata',imputar=False,smote=None)
-            e['especificaciones'][nombre]=(e['RandomForestClassifier'](n_estimators=3,max_depth=2,random_state=42,n_jobs=1),False,False,e['X'])
-            e['planes_candidatos'][p].update(parametros=e['especificaciones'][nombre][0].get_params(),pesos=False,escalar=False,huella_entradas=hashlib.sha256(pd.util.hash_pandas_object(e['X'],index=True).values.tobytes()).hexdigest())
-        nuevos=dev.iloc[:20].copy();nuevos['patient_id']=100+np.repeat([0,1],10)
-        b=Path(carpeta)/'base_extra.csv';c=Path(carpeta)/'candidato_extra.csv'
-        nuevos.to_csv(b,index=False);nuevos.to_csv(c,index=False)
-        return e,b,c
+            modelo=e['RandomForestClassifier'](n_estimators=3,max_depth=2,random_state=42,n_jobs=1)
+            e['especificaciones'][nombre]=(modelo,False,False,e['X'])
+            e['planes_candidatos'][p]=dict(columnas=columnas,retardos=[],representacion='candidata',
+                imputar=False,smote=None,parametros=modelo.get_params(),pesos=False,escalar=False,
+                huella_entradas=hashlib.sha256(pd.util.hash_pandas_object(e['X'],index=True).values.tobytes()).hexdigest())
+        return e
 
-    def test_comparacion_adicional_mismos_pacientes_y_relectura(self):
+    def test_test_requiere_autorizacion_y_no_escribe(self):
         with tempfile.TemporaryDirectory(dir=base_tests.TEMP_ROOT) as carpeta:
-            e,b,c=self.adicional_fixture(carpeta)
-            resultados=e['comparar_adicionales'](b,c)
+            e=self.reservado_fixture(carpeta)
+            with self.assertRaisesRegex(RuntimeError,'desactivada'):
+                e['comparar_test_reservado']()
+            self.assertFalse((Path(carpeta)/'comparacion_test').exists())
+
+    def test_test_mismas_claves_una_inferencia_y_relectura(self):
+        with tempfile.TemporaryDirectory(dir=base_tests.TEMP_ROOT) as carpeta:
+            e=self.reservado_fixture(carpeta)
+            llamadas=[]; original=e['RandomForestClassifier'].predict_proba
+            def contar(modelo, X, **kwargs):
+                if len(X)==len(e['test']): llamadas.append(X.copy())
+                return original(modelo,X,**kwargs)
+            with patch.object(e['RandomForestClassifier'],'predict_proba',new=contar):
+                resultados=e['comparar_test_reservado'](autorizar=True)
+            self.assertEqual(len(llamadas),2)
             e['pd'].testing.assert_frame_equal(resultados['pacientes']['datos'][e['CLAVES']],resultados['epochs']['datos'][e['CLAVES']])
+            self.assertEqual(len(resultados['pacientes']['datos']),20)
+            paths=[p for p in (Path(carpeta)/'comparacion_test').rglob('*') if p.is_file()]
+            antes={p:(p.stat().st_mtime_ns,p.read_bytes()) for p in paths}
             with patch.object(e['RandomForestClassifier'],'fit',side_effect=AssertionError('No entrenar')),patch.object(e['RandomForestClassifier'],'predict_proba',side_effect=AssertionError('No inferir')):
-                e['comparar_adicionales'](b,c)
+                e['comparar_test_reservado']()
+            self.assertEqual(antes,{p:(p.stat().st_mtime_ns,p.read_bytes()) for p in paths})
             e['planes_candidatos']['epochs']['retardos']=[1]
             with self.assertRaisesRegex(ValueError,'Cambió'):
-                e['comparar_adicionales'](b,c)
+                e['comparar_test_reservado']()
 
-    def test_adicional_rechaza_pacientes_ya_utilizados(self):
+    def test_serializacion_tolera_redondeo_paralelo_sin_cambiar_clases(self):
         with tempfile.TemporaryDirectory(dir=base_tests.TEMP_ROOT) as carpeta:
-            e,b,c=self.adicional_fixture(carpeta)
-            tabla=e['pd'].read_csv(b);tabla['patient_id']-=100
-            tabla.to_csv(b,index=False);tabla.to_csv(c,index=False)
-            with self.assertRaisesRegex(ValueError,'cohorte histórica'):
-                e['preparar_adicionales'](b,c)
+            e=self.reservado_fixture(carpeta)
+            original=e['RandomForestClassifier'].predict_proba
+            llamadas=[0]
+            def redondear(modelo,X,**kwargs):
+                prob=original(modelo,X,**kwargs)
+                if len(X)==len(e['dev']):
+                    llamadas[0]+=1
+                    if llamadas[0]==2:
+                        c=prob[0].argmax();prob[0,c]-=1e-15;prob[0,(c+1)%5]+=1e-15
+                return prob
+            with patch.object(e['RandomForestClassifier'],'predict_proba',new=redondear):
+                e['comparar_test_reservado'](autorizar=True)
+            serial=json.loads((Path(carpeta)/'comparacion_test/pacientes/serializacion.json').read_text())
+            self.assertGreater(serial['max_diferencia'],0)
+            self.assertTrue(serial['igualdad_clases'])
 
-    def test_candidato_no_cambia_antes_de_comparar_adicionales(self):
+    def test_test_rechaza_superposicion_y_columnas(self):
         with tempfile.TemporaryDirectory(dir=base_tests.TEMP_ROOT) as carpeta:
-            e,b,c=self.adicional_fixture(carpeta)
+            e=self.reservado_fixture(carpeta)
+            e['test'].loc[0,'patient_id']=0
+            with self.assertRaisesRegex(ValueError,'comparten'):
+                e['preparar_test_reservado'](e['planes_candidatos'])
+        with tempfile.TemporaryDirectory(dir=base_tests.TEMP_ROOT) as carpeta:
+            e=self.reservado_fixture(carpeta)
+            e['planes_candidatos']['epochs']['columnas']=list(reversed(e['columnas_principal']))
+            with self.assertRaisesRegex(ValueError,'Columnas'):
+                e['preparar_test_reservado'](e['planes_candidatos'])
+
+    def test_candidato_no_cambia_antes_del_test(self):
+        with tempfile.TemporaryDirectory(dir=base_tests.TEMP_ROOT) as carpeta:
+            e=self.reservado_fixture(carpeta)
             nombre=e['candidatos_escenario']['pacientes']
             e['especificaciones'][nombre][0].set_params(max_depth=3)
             with self.assertRaisesRegex(ValueError,'candidato cambió'):
-                e['comparar_adicionales'](b,c)
-
-    def test_adicional_rechaza_identidades_con_otro_formato(self):
-        with tempfile.TemporaryDirectory(dir=base_tests.TEMP_ROOT) as carpeta:
-            e,b,c=self.adicional_fixture(carpeta)
-            tabla=e['pd'].read_csv(b);tabla['patient_id']='S'+tabla.patient_id.astype(str)
-            tabla.to_csv(b,index=False);tabla.to_csv(c,index=False)
-            with self.assertRaisesRegex(ValueError,'Formato de patient_id'):
-                e['preparar_adicionales'](b,c)
+                e['comparar_test_reservado'](autorizar=True)
 
     def test_comparacion_incompleta_no_se_repite(self):
         with tempfile.TemporaryDirectory(dir=base_tests.TEMP_ROOT) as carpeta:
-            e,b,c=self.adicional_fixture(carpeta)
-            with patch.object(e['RandomForestClassifier'],'predict_proba',side_effect=RuntimeError('fallo simulado')):
+            e=self.reservado_fixture(carpeta)
+            original=e['RandomForestClassifier'].predict_proba
+            def fallar(modelo,X,**kwargs):
+                if len(X)==len(e['test']): raise RuntimeError('fallo simulado')
+                return original(modelo,X,**kwargs)
+            with patch.object(e['RandomForestClassifier'],'predict_proba',new=fallar):
                 with self.assertRaisesRegex(RuntimeError,'fallo simulado'):
-                    e['comparar_adicionales'](b,c)
+                    e['comparar_test_reservado'](autorizar=True)
             with self.assertRaisesRegex(RuntimeError,'incompleta'):
-                e['comparar_adicionales'](b,c)
+                e['comparar_test_reservado'](autorizar=True)
+
+    def test_test_rechaza_probabilidades_y_artefactos_alterados(self):
+        with tempfile.TemporaryDirectory(dir=base_tests.TEMP_ROOT) as carpeta:
+            e=self.reservado_fixture(carpeta)
+            r=e['comparar_test_reservado'](autorizar=True)
+            datos=r['pacientes']['datos'].copy();datos.loc[0,'prob_W']=-.1
+            with self.assertRaisesRegex(ValueError,'Probabilidades'):
+                e['validar_predicciones_test'](datos)
+            ruta=Path(carpeta)/'comparacion_test/pacientes/predicciones.csv'
+            ruta.write_bytes(ruta.read_bytes()+b'\n')
+            with self.assertRaisesRegex(ValueError,'Artefactos'):
+                e['comparar_test_reservado']()
+
+    def test_test_imputacion_solo_desarrollo_y_pesos(self):
+        import joblib
+        with tempfile.TemporaryDirectory(dir=base_tests.TEMP_ROOT) as carpeta:
+            e=self.reservado_fixture(carpeta)
+            pd,np=e['pd'],e['np']
+            representaciones=e['construir_representaciones'](e['dev'],e['dev'])
+            entradas,_=e['agregar_historia'](representaciones['candidata'],e['dev'],[1])
+            for p in ['pacientes','epochs']:
+                nombre=e['candidatos_escenario'][p]
+                modelo=e['especificaciones'][nombre][0]
+                e['especificaciones'][nombre]=(modelo,True,False,entradas)
+                e['planes_candidatos'][p].update(columnas=list(entradas.columns),retardos=[1],
+                    imputar=True,pesos=True,huella_entradas=hashlib.sha256(pd.util.hash_pandas_object(entradas,index=True).values.tobytes()).hexdigest())
+            e['comparar_test_reservado'](autorizar=True)
+            pipe=joblib.load(Path(carpeta)/'comparacion_test/pacientes/pipeline.joblib')
+            self.assertEqual(pipe.named_steps['imputacion'].statistics_[0],e['dev'].HR_median.median())
+            self.assertLess(pipe.named_steps['imputacion'].statistics_[0],10000)
+            self.assertEqual(pipe.n_features_in_,45)
+            serial=json.loads((Path(carpeta)/'comparacion_test/pacientes/serializacion.json').read_text())
+            self.assertTrue(serial['igualdad_clases'])
+            self.assertTrue(serial['probabilidades_equivalentes'])
 
 
-if __name__=='__main__':unittest.main()
+if __name__=='__main__':
+    unittest.main()

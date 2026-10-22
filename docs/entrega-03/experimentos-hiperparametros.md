@@ -1,6 +1,276 @@
-# Experimentos de hiperparámetros
+# Experimentos de hiperparámetros, historia y balanceo
 
-> **Referencia del notebook oficial previo.** Este documento conserva resultados y decisiones de esa versión. La copia de revisión está implementada pero pendiente de ejecución completa; consultar el [estado vigente](README.md). Las menciones de evaluación cronológica, solo wearable o pendientes antiguos describen ese estado anterior y no forman parte del alcance de la revisión.
+## Ronda vigente · revisión ejecutada
+
+Selección por pacientes separados y epochs mezclados con el mismo catálogo reducido. Las fuentes, folds, versiones y configuraciones exactas están en las exportaciones del [notebook de revisión](../../temporal_version_tp_entrega03_revision.ipynb). No se amplió la búsqueda: 16 variantes individuales de RF/XGBoost; logística conserva C=1. Los valores son alternativas ensayadas, no óptimos demostrados.
+
+El desarrollo nuevo se ejecutó desde un kernel limpio con `N_JOBS=-1`, CPU, semilla 42 y versiones registradas. No estaban disponibles las exportaciones completas de Kaggle de 4.1–4.5.2, por lo que se repitieron los bloques necesarios en vez de reconstruir predicciones desde tablas. Las salidas recibidas de Kaggle (`N_JOBS=2`) se conservaron como evidencia anterior; sus tiempos no son comparables directamente con esta ejecución. Los registros `ejecuciones.jsonl` distinguen entrenamiento ejecutado y reutilización compatible.
+
+Antes de predecir el test, la comprobación binaria de serialización de RF detectó diferencias de redondeo de aproximadamente 3,3 × 10⁻¹⁶, sin cambiar clases. Se corrigió el control a tolerancia 10⁻¹² con clases idénticas y se agregó una prueba de regresión. Se conservó el estado interrumpido y se completó 4.7 en otro kernel limpio desde los dos pipelines guardados y verificados, sin reentrenarlos ni repetir predicciones de test. La continuación preapertura quedó auditada; el flujo normal sigue bloqueando estados incompletos. Los tiempos exactos de ese entrenamiento final no se habían persistido antes de la interrupción y se muestran ausentes, sin estimarlos. Sí están disponibles los costos de entrenamiento de validación y los tiempos reales de inferencia.
+
+Las nuevas salidas viven en `output/modelado_revision/`. Los artefactos de comparación están en `comparacion_test/`: configuraciones congeladas, pipelines, pruebas de serialización, predicciones únicas, métricas, diagnósticos y diferencias por paciente. El notebook oficial y el código/salidas históricos de 4.8 se preservaron. No se ejecutó 4.8.
+
+### Candidatos fijados antes de comparar test
+
+- **Pacientes separados:** `contexto_pacientes_XGB_lag_1+2`; `n_estimators=200`, `max_depth=4`, `learning_rate=0.1`, `reg_lambda=5`, `min_child_weight=None`, `subsample=0.8`, `colsample_bytree=0.8`; representación `candidata`; pesos balanceados; retardos [1, 2]; SMOTE `None`; 68 entradas. Las opciones predeterminadas se registran en la configuración congelada.
+- **Epochs mezclados:** `smote_epochs_RF_ratio1.0_k5`; `n_estimators=200`, `max_depth=None`, `min_samples_leaf=2`, `max_features=sqrt`; representación `candidata`; pesos desactivados; retardos []; SMOTE `{'ratio': 1.0, 'k': 5}`; 22 entradas. Las opciones predeterminadas se registran en la configuración congelada.
+
+| Selección | Algoritmo | Pesos | Historia (min) | Entradas | F1 validación ± DE | F1 test | Exactitud test |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Pacientes separados | XGB | Sí | [1, 2] | 68 | 0,5053 ± 0,0265 | 0,5412 | 0,6126 |
+| Epochs mezclados | RF | No | Sin historia | 22 | 0,8006 ± 0,0038 | 0,4985 | 0,6278 |
+
+### Pruebas históricas adicionales: efecto de los hiperparámetros
+
+Resultados recuperados de exportaciones del notebook original, **sin nuevos entrenamientos ni búsqueda ampliada**.
+Corresponden a pacientes separados, pesos balanceados y 22 variables sin historia. Se verificaron las mismas fuentes,
+versiones y folds de desarrollo. No son pruebas sobre el XGBoost final de 68 entradas y no se incorporan retroactivamente
+a la selección congelada. Los tiempos pertenecen a esa ejecución histórica, no se mezclan con los tiempos actuales.
+
+| Cambio histórico | F1 referencia → prueba | Brecha referencia → prueba | Entrenamiento referencia → prueba (s) | Lectura breve |
+| --- | --- | --- | --- | --- |
+| XGB: lambda 1 → 5 | 0,4859 → 0,4907 | 0,2974 → 0,2879 | 16,3564 → 16,6298 | Pequeña mejora observada; mayor regularización no garantiza mejorar siempre. |
+| XGB: profundidad 4 → 6 | 0,4859 → 0,4803 | 0,2974 → 0,4154 | 16,3564 → 30,6349 | Más capacidad aumentó la brecha y empeoró validación. |
+| XGB: rondas 200 → 400 | 0,4859 → 0,4845 | 0,2974 → 0,3657 | 16,3564 → 35,4488 | Más costo sin mejora observada de validación. |
+| XGB: tasa 0,1 → 0,03 | 0,4859 → 0,4659 | 0,2974 → 0,2064 | 16,3564 → 17,5536 | Con 200 rondas fijas empeoró; no prueba que una tasa menor sea siempre peor. |
+| RF: mínimo por hoja 2 → 10 | 0,4412 → 0,4614 | 0,5190 → 0,3761 | 37,1971 → 11,2175 | Menos hojas específicas mejoró validación y redujo la brecha. |
+| RF: mínimo por hoja 2 → 30 | 0,4412 → 0,4483 | 0,5190 → 0,2795 | 37,1971 → 6,7703 | Más restricción no conservó toda la mejora obtenida con 10. |
+
+La brecha es F1 de entrenamiento menos validación. Menor brecha no basta si empeora la predicción.
+Estas pruebas justifican decisiones dentro de las alternativas ensayadas; no demuestran hiperparámetros óptimos.
+Detalle y procedencia por prueba en la [guía de experimentos](experimentos-hiperparametros.md).
+
+
+### Interpretación del XGBoost final con historia
+
+Se mantuvo la configuración congelada XGBoost ponderada con historia 1+2 minutos y sus 68 entradas. Se reentrenó exclusivamente en los cinco folds por pacientes de desarrollo, con imputación y pesos aprendidos en entrenamiento. Cinco permutaciones por variable y por grupo dentro de cada validación; primero se promedian repeticiones por fold y después los cinco folds con igual peso. El F1 base medio fue 0,5053, coherente con la selección ya guardada. No se ejecutó ni se volvió a predecir el test.
+
+| Grupo permutado conjuntamente | Columnas | Caída media de F1 macro | Desviación entre folds |
+| --- | --- | --- | --- |
+| Actuales | 22 | 0,2306 | 0,0244 |
+| Hace 1 minuto | 22 | 0,0476 | 0,0258 |
+| Hace 2 minutos | 22 | 0,0218 | 0,0307 |
+| Disponibilidad | 2 | 0,0006 | 0,0003 |
+
+La mayor caída media correspondió al grupo **actuales** (0,2306). Los antecedentes de un minuto y dos minutos tuvieron caídas medias 0,0476 y 0,0218; describen dependencia del modelo, no una mejora garantizada al agregarlos. Los indicadores de disponibilidad tuvieron caída media 0,0006. Las desviaciones reflejan variación entre folds; no constituyen una prueba estadística de superioridad entre grupos.
+
+Entradas individuales destacadas: `EOG_max_std`, `C4-M1_std`, `CHIN_std`, `F4-M1_std`, `CZ - T4_std`. El notebook muestra las 20 mayores caídas medias por color de grupo y exporta las 68. Primeras ocho:
+
+| Entrada | Grupo | Caída media de F1 macro | Desviación entre folds |
+| --- | --- | --- | --- |
+| EOG_max_std | Actuales | 0,0353 | 0,0144 |
+| C4-M1_std | Actuales | 0,0266 | 0,0243 |
+| CHIN_std | Actuales | 0,0243 | 0,0223 |
+| F4-M1_std | Actuales | 0,0216 | 0,0214 |
+| CZ - T4_std | Actuales | 0,0188 | 0,0320 |
+| T3 - CZ_std | Actuales | 0,0105 | 0,0133 |
+| ACC_axes_std_norm_log1p | Actuales | 0,0083 | 0,0023 |
+| O2-M1_std | Actuales | 0,0069 | 0,0058 |
+
+La importancia conjunta se calcula permutando todas las columnas de un grupo con el mismo orden de filas y dejando las demás intactas. **No es la suma de importancias individuales ni un porcentaje causal**; los grupos tienen tamaños diferentes. La correlación puede repartir u ocultar información, y las permutaciones pueden generar combinaciones poco habituales. Una caída negativa no garantiza mejorar al quitar una entrada. Estos resultados no cambian columnas, parámetros ni candidatos.
+
+Las exportaciones están en `output/modelado_revision/interpretacion_xgb_historia/`: permutaciones completas, medias por fold, tablas individuales/grupales, medianas y pesos de entrenamiento, métricas base, trazabilidad y dos gráficos. Una ejecución completa se verifica y relee sin entrenar; una incompleta se conserva y bloquea sobrescrituras.
+
+
+### Historia y SMOTE: evidencia decisiva
+
+| Protocolo | Prueba | Mejor variante observada | F1 referencia | F1 variante | Diferencia | Brecha | Entrenamiento 5 folds (s) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Pacientes separados | Contexto temporal | Historia 1+2 minutos (dos mejores individuales) | 0,4907 | 0,5053 | 0,0147 | 0,3010 | 12,1839 |
+| Pacientes separados | SMOTE | SMOTE objetivo 100% de mayoritaria; k=3 | 0,4451 | 0,4860 | 0,0409 | 0,2911 | 12,7084 |
+| Epochs mezclados | Contexto temporal | Historia 15 minutos | 0,7860 | 0,7888 | 0,0029 | 0,1777 | 13,6455 |
+| Epochs mezclados | SMOTE | SMOTE objetivo 100% de mayoritaria; k=5 | 0,7645 | 0,8006 | 0,0360 | 0,1947 | 38,1493 |
+
+En la tabla, SMOTE se contrasta con el control escalado sin pesos. Comparación adicional frente al control ponderado sin historia:
+
+- **Pacientes separados:** mejor SMOTE 0,4860; control ponderado sin historia 0,4491; diferencia SMOTE menos ponderado 0,0369.
+- **Epochs mezclados:** mejor SMOTE 0,8006; control ponderado sin historia 0,7617; diferencia SMOTE menos ponderado 0,0388.
+
+Historia y SMOTE se probaron por separado sobre el ganador base de cada protocolo. Los controles originales, ponderados y escalados permiten distinguir cambios de ponderación, escalado y remuestreo. No se crean pacientes nuevos; el test y las validaciones permanecen reales. Diferencias pequeñas no prueban superioridad concluyente; una brecha menor no compensa por sí sola menor F1 de validación.
+
+### Detalle y conclusión de cada prueba ejecutada
+
+Se registraron 65 comparaciones: Hiperparámetro: 16, Contexto temporal: 14, SMOTE: 8, Protocolo: 7, Balanceo control: 6, Pesos: 6, Control: 4, Representación: 4. Los tiempos son los observados en esta ejecución; las repeticiones compatibles conservan el tiempo de su entrenamiento original. Las diferencias de etapas se indican con respecto a la referencia del mismo experimento.
+
+#### Pacientes separados
+
+**Pesos**
+
+- **`pacientes_Logistica_pesos1`** frente a `pacientes_Logistica_pesos0`: Sin pesos → pesos balanceados. F1 0,2610 → 0,3467 (Δ 0,0857); DE 0,0390; brecha 0,0729 (Δ 0,0354); entrenamiento 2,3343 s (Δ -0,5821 s). REM: ΔF1 +0.3323, Δprecisión +0.0723, Δrecuperación +0.6400; N2: ΔF1 -0.2359, Δprecisión +0.1961, Δrecuperación -0.5756. **Conclusión:** Mayor F1 promedio en 5/5 folds; la brecha no se redujo claramente. **Decisión:** Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+- **`pacientes_RF_pesos1`** frente a `pacientes_RF_pesos0`: Sin pesos → pesos balanceados. F1 0,3847 → 0,4412 (Δ 0,0565); DE 0,0288; brecha 0,5190 (Δ -0,0857); entrenamiento 32,1851 s (Δ -9,6967 s). N3: ΔF1 +0.2340, Δprecisión -0.2604, Δrecuperación +0.2363; N2: ΔF1 -0.0243, Δprecisión +0.0685, Δrecuperación -0.1317. **Conclusión:** Mayor F1 promedio en 5/5 folds; también se redujo la brecha. **Decisión:** Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+- **`pacientes_XGB_pesos1`** frente a `pacientes_XGB_pesos0`: Sin pesos → pesos balanceados. F1 0,4465 → 0,4859 (Δ 0,0395); DE 0,0299; brecha 0,2974 (Δ -0,0615); entrenamiento 14,2974 s (Δ -0,1204 s). N3: ΔF1 +0.1424, Δprecisión -0.1284, Δrecuperación +0.3342; N2: ΔF1 -0.0455, Δprecisión +0.0911, Δrecuperación -0.1739. **Conclusión:** Mayor F1 promedio en 5/5 folds; también se redujo la brecha. **Decisión:** Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+**Hiperparámetro**
+
+- **`ajuste_RF_pesos0_max_depth_16`** frente a `pacientes_RF_pesos0`: max_depth=16. F1 0,3847 → 0,3519 (Δ -0,0328); DE 0,0272; brecha 0,5033 (Δ -0,1014); entrenamiento 9,6717 s (Δ -32,2101 s). N3: ΔF1 +0.0019, Δprecisión -0.0785, Δrecuperación +0.0015; REM: ΔF1 -0.0991, Δprecisión +0.0413, Δrecuperación -0.1305. **Conclusión:** Menor F1 promedio; mejoró en 0/5 folds. La menor brecha no compensó la pérdida de validación. **Decisión:** No priorizar para esta ronda según F1 macro.
+
+- **`ajuste_RF_pesos0_min_samples_leaf_10`** frente a `pacientes_RF_pesos0`: min_samples_leaf=10. F1 0,3847 → 0,3756 (Δ -0,0091); DE 0,0272; brecha 0,4489 (Δ -0,1558); entrenamiento 10,6526 s (Δ -31,2292 s). N3: ΔF1 +0.0243, Δprecisión -0.0300, Δrecuperación +0.0182; N1: ΔF1 -0.0328, Δprecisión -0.0371, Δrecuperación -0.0223. **Conclusión:** Menor F1 promedio; mejoró en 1/5 folds. La menor brecha no compensó la pérdida de validación. **Decisión:** No priorizar para esta ronda según F1 macro.
+
+- **`ajuste_RF_pesos1_max_depth_16`** frente a `pacientes_RF_pesos1`: max_depth=16. F1 0,4412 → 0,4530 (Δ 0,0118); DE 0,0351; brecha 0,4189 (Δ -0,1001); entrenamiento 8,1932 s (Δ -23,9919 s). N3: ΔF1 +0.0436, Δprecisión +0.0202, Δrecuperación +0.0565; N2: ΔF1 -0.0262, Δprecisión +0.0178, Δrecuperación -0.0614. **Conclusión:** Mayor F1 promedio en 4/5 folds; también se redujo la brecha. **Decisión:** Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+- **`ajuste_RF_pesos1_min_samples_leaf_10`** frente a `pacientes_RF_pesos1`: min_samples_leaf=10. F1 0,4412 → 0,4614 (Δ 0,0201); DE 0,0205; brecha 0,3761 (Δ -0,1430); entrenamiento 8,3861 s (Δ -23,7990 s). N3: ΔF1 +0.0908, Δprecisión -0.0680, Δrecuperación +0.2179; N2: ΔF1 -0.0278, Δprecisión +0.0281, Δrecuperación -0.0715. **Conclusión:** Mayor F1 promedio en 4/5 folds; también se redujo la brecha. **Decisión:** Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+- **`ajuste_XGB_pesos0_max_depth_2`** frente a `pacientes_XGB_pesos0`: max_depth=2. F1 0,4465 → 0,4276 (Δ -0,0189); DE 0,0352; brecha 0,2455 (Δ -0,1135); entrenamiento 3,8472 s (Δ -10,5706 s). REM: ΔF1 +0.0145, Δprecisión +0.0086, Δrecuperación +0.0122; N3: ΔF1 -0.0631, Δprecisión -0.1222, Δrecuperación -0.0379. **Conclusión:** Menor F1 promedio; mejoró en 1/5 folds. La menor brecha no compensó la pérdida de validación. **Decisión:** No priorizar para esta ronda según F1 macro.
+
+- **`ajuste_XGB_pesos0_reg_lambda_5`** frente a `pacientes_XGB_pesos0`: reg_lambda=5. F1 0,4465 → 0,4491 (Δ 0,0026); DE 0,0355; brecha 0,3507 (Δ -0,0082); entrenamiento 5,3580 s (Δ -9,0597 s). N1: ΔF1 +0.0065, Δprecisión +0.0177, Δrecuperación +0.0037; N2: ΔF1 +0.0005, Δprecisión +0.0012, Δrecuperación -0.0004. **Conclusión:** Mayor F1 promedio en 3/5 folds; también se redujo la brecha. La ventaja media es pequeña, sin prueba de superioridad estadística. **Decisión:** Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+- **`ajuste_XGB_pesos1_max_depth_2`** frente a `pacientes_XGB_pesos1`: max_depth=2. F1 0,4859 → 0,4611 (Δ -0,0248); DE 0,0333; brecha 0,1793 (Δ -0,1181); entrenamiento 9,1767 s (Δ -5,1206 s). REM: ΔF1 +0.0250, Δprecisión -0.0043, Δrecuperación +0.0697; N3: ΔF1 -0.0621, Δprecisión -0.1341, Δrecuperación +0.1674. **Conclusión:** Menor F1 promedio; mejoró en 0/5 folds. La menor brecha no compensó la pérdida de validación. **Decisión:** No priorizar para esta ronda según F1 macro.
+
+- **`ajuste_XGB_pesos1_reg_lambda_5`** frente a `pacientes_XGB_pesos1`: reg_lambda=5. F1 0,4859 → 0,4907 (Δ 0,0047); DE 0,0327; brecha 0,2879 (Δ -0,0095); entrenamiento 14,5448 s (Δ 0,2474 s). N1: ΔF1 +0.0073, Δprecisión +0.0069, Δrecuperación +0.0078; N2: ΔF1 +0.0017, Δprecisión +0.0005, Δrecuperación +0.0025. **Conclusión:** Mayor F1 promedio en 4/5 folds; también se redujo la brecha. La ventaja media es pequeña, sin prueba de superioridad estadística. **Decisión:** Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+**Control**
+
+- **`representacion_RF_candidata`** frente a `ajuste_RF_pesos1_min_samples_leaf_10`: candidata. F1 0,4614 → 0,4614 (Δ -0,0000); DE 0,0205; brecha 0,3761 (Δ 0,0000); entrenamiento 8,3861 s (Δ 0,0000 s). N3: ΔF1 +0.0000, Δprecisión +0.0000, Δrecuperación +0.0000; REM: ΔF1 -0.0000, Δprecisión +0.0000, Δrecuperación +0.0000. **Conclusión:** Repetición de la misma configuración y entradas; las diferencias de tiempo no son efecto de un hiperparámetro. **Decisión:** Usar como control de representación; no contar como mejora nueva.
+
+- **`representacion_XGB_candidata`** frente a `ajuste_XGB_pesos1_reg_lambda_5`: candidata. F1 0,4907 → 0,4907 (Δ -0,0000); DE 0,0327; brecha 0,2879 (Δ 0,0000); entrenamiento 14,5448 s (Δ 0,0000 s). REM: ΔF1 +0.0000, Δprecisión -0.0000, Δrecuperación -0.0000; N1: ΔF1 -0.0000, Δprecisión +0.0000, Δrecuperación +0.0000. **Conclusión:** Repetición de la misma configuración y entradas; las diferencias de tiempo no son efecto de un hiperparámetro. **Decisión:** Usar como control de representación; no contar como mejora nueva.
+
+**Representación**
+
+- **`representacion_RF_separada_con_log`** frente a `ajuste_RF_pesos1_min_samples_leaf_10`: separada_con_log. F1 0,4614 → 0,4680 (Δ 0,0066); DE 0,0302; brecha 0,3731 (Δ -0,0029); entrenamiento 9,9561 s (Δ 1,5700 s). REM: ΔF1 +0.0128, Δprecisión +0.0105, Δrecuperación +0.0200; N3: ΔF1 -0.0036, Δprecisión -0.0128, Δrecuperación +0.0093. **Conclusión:** Mayor F1 promedio en 3/5 folds; también se redujo la brecha. **Decisión:** Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+- **`representacion_XGB_separada_con_log`** frente a `ajuste_XGB_pesos1_reg_lambda_5`: separada_con_log. F1 0,4907 → 0,4814 (Δ -0,0093); DE 0,0307; brecha 0,3025 (Δ 0,0147); entrenamiento 5,8685 s (Δ -8,6763 s). N2: ΔF1 +0.0016, Δprecisión +0.0010, Δrecuperación +0.0030; REM: ΔF1 -0.0178, Δprecisión -0.0034, Δrecuperación -0.0284. **Conclusión:** Menor F1 promedio; mejoró en 1/5 folds. **Decisión:** No priorizar para esta ronda según F1 macro.
+
+**Contexto temporal**
+
+- **`contexto_pacientes_XGB_lag_1`** frente a `ajuste_XGB_pesos1_reg_lambda_5`: Historia 1 minutos. F1 0,4907 → 0,4964 (Δ 0,0058); DE 0,0331; brecha 0,3023 (Δ 0,0145); entrenamiento 8,8182 s (Δ -5,7265 s). REM: ΔF1 +0.0270, Δprecisión +0.0364, Δrecuperación +0.0229; N3: ΔF1 -0.0139, Δprecisión -0.0096, Δrecuperación -0.0198. **Conclusión:** Mayor F1 promedio en 3/5 folds; la brecha no se redujo claramente. **Decisión:** Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+- **`contexto_pacientes_XGB_lag_2`** frente a `ajuste_XGB_pesos1_reg_lambda_5`: Historia 2 minutos. F1 0,4907 → 0,4940 (Δ 0,0033); DE 0,0330; brecha 0,3025 (Δ 0,0147); entrenamiento 8,6672 s (Δ -5,8776 s). REM: ΔF1 +0.0154, Δprecisión +0.0221, Δrecuperación +0.0084; N3: ΔF1 -0.0095, Δprecisión -0.0030, Δrecuperación -0.0167. **Conclusión:** Mayor F1 promedio en 3/5 folds; la brecha no se redujo claramente. La ventaja media es pequeña, sin prueba de superioridad estadística. **Decisión:** Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+- **`contexto_pacientes_XGB_lag_5`** frente a `ajuste_XGB_pesos1_reg_lambda_5`: Historia 5 minutos. F1 0,4907 → 0,4881 (Δ -0,0026); DE 0,0352; brecha 0,3053 (Δ 0,0174); entrenamiento 18,9555 s (Δ 4,4107 s). N1: ΔF1 +0.0078, Δprecisión +0.0097, Δrecuperación +0.0063; N3: ΔF1 -0.0276, Δprecisión -0.0186, Δrecuperación -0.0400. **Conclusión:** Menor F1 promedio; mejoró en 3/5 folds. **Decisión:** No priorizar para esta ronda según F1 macro.
+
+- **`contexto_pacientes_XGB_lag_10`** frente a `ajuste_XGB_pesos1_reg_lambda_5`: Historia 10 minutos. F1 0,4907 → 0,4916 (Δ 0,0009); DE 0,0279; brecha 0,3008 (Δ 0,0130); entrenamiento 20,7629 s (Δ 6,2182 s). N1: ΔF1 +0.0066, Δprecisión +0.0096, Δrecuperación +0.0049; N2: ΔF1 -0.0032, Δprecisión -0.0027, Δrecuperación -0.0020. **Conclusión:** Mayor F1 promedio en 3/5 folds; la brecha no se redujo claramente. La ventaja media es pequeña, sin prueba de superioridad estadística. **Decisión:** Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+- **`contexto_pacientes_XGB_lag_15`** frente a `ajuste_XGB_pesos1_reg_lambda_5`: Historia 15 minutos. F1 0,4907 → 0,4927 (Δ 0,0021); DE 0,0329; brecha 0,2993 (Δ 0,0114); entrenamiento 8,5491 s (Δ -5,9957 s). REM: ΔF1 +0.0196, Δprecisión +0.0324, Δrecuperación +0.0129; N3: ΔF1 -0.0103, Δprecisión +0.0015, Δrecuperación -0.0239. **Conclusión:** Mayor F1 promedio en 4/5 folds; la brecha no se redujo claramente. La ventaja media es pequeña, sin prueba de superioridad estadística. **Decisión:** Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+- **`contexto_pacientes_XGB_lag_5+10`** frente a `ajuste_XGB_pesos1_reg_lambda_5`: Historia 5+10 minutos. F1 0,4907 → 0,4893 (Δ -0,0014); DE 0,0371; brecha 0,3110 (Δ 0,0231); entrenamiento 12,6418 s (Δ -1,9030 s). REM: ΔF1 +0.0205, Δprecisión +0.0389, Δrecuperación +0.0170; N3: ΔF1 -0.0311, Δprecisión -0.0176, Δrecuperación -0.0498. **Conclusión:** Menor F1 promedio; mejoró en 3/5 folds. **Decisión:** No priorizar para esta ronda según F1 macro.
+
+- **`contexto_pacientes_XGB_lag_1+2`** frente a `ajuste_XGB_pesos1_reg_lambda_5`: Historia 1+2 minutos (dos mejores individuales). F1 0,4907 → 0,5053 (Δ 0,0147); DE 0,0265; brecha 0,3010 (Δ 0,0131); entrenamiento 12,1839 s (Δ -2,3608 s). REM: ΔF1 +0.0377, Δprecisión +0.0295, Δrecuperación +0.0464; N3: ΔF1 +0.0002, Δprecisión +0.0131, Δrecuperación -0.0132. **Conclusión:** Mayor F1 promedio en 4/5 folds; la brecha no se redujo claramente. **Decisión:** Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+**Balanceo control**
+
+- **`balanceo_pacientes_XGB_sin_pesos`** frente a `ajuste_XGB_pesos1_reg_lambda_5`: Misma configuración sin ponderación. F1 0,4907 → 0,4491 (Δ -0,0416); DE 0,0355; brecha 0,3507 (Δ 0,0628); entrenamiento 5,3580 s (Δ -9,1867 s). N2: ΔF1 +0.0443, Δprecisión -0.0904, Δrecuperación +0.1710; N3: ΔF1 -0.1444, Δprecisión +0.1251, Δrecuperación -0.3380. **Conclusión:** Menor F1 promedio; mejoró en 1/5 folds. **Decisión:** No priorizar para esta ronda según F1 macro.
+
+- **`balanceo_pacientes_XGB_pesos`** frente a `balanceo_pacientes_XGB_sin_pesos`: Misma configuración con pesos balanceados. F1 0,4491 → 0,4907 (Δ 0,0416); DE 0,0327; brecha 0,2879 (Δ -0,0628); entrenamiento 14,5448 s (Δ 9,1867 s). N3: ΔF1 +0.1444, Δprecisión -0.1251, Δrecuperación +0.3380; N2: ΔF1 -0.0443, Δprecisión +0.0904, Δrecuperación -0.1710. **Conclusión:** Mayor F1 promedio en 4/5 folds; también se redujo la brecha. **Decisión:** Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+- **`balanceo_pacientes_XGB_escala`** frente a `balanceo_pacientes_XGB_sin_pesos`: Escalado sin remuestreo ni pesos. F1 0,4491 → 0,4451 (Δ -0,0040); DE 0,0332; brecha 0,3545 (Δ 0,0038); entrenamiento 5,4983 s (Δ 0,1403 s). N1: ΔF1 +0.0020, Δprecisión -0.0029, Δrecuperación +0.0027; N3: ΔF1 -0.0095, Δprecisión -0.0135, Δrecuperación -0.0090. **Conclusión:** Menor F1 promedio; mejoró en 0/5 folds. **Decisión:** No priorizar para esta ronda según F1 macro.
+
+**SMOTE**
+
+- **`smote_pacientes_XGB_ratio0.5_k3`** frente a `balanceo_pacientes_XGB_escala`: SMOTE objetivo 50% de mayoritaria; k=3. F1 0,4451 → 0,4830 (Δ 0,0379); DE 0,0289; brecha 0,3147 (Δ -0,0399); entrenamiento 9,8013 s (Δ 4,3030 s). N3: ΔF1 +0.1351, Δprecisión -0.0666, Δrecuperación +0.2413; W: ΔF1 -0.0312, Δprecisión -0.0047, Δrecuperación -0.0552. **Conclusión:** Mayor F1 promedio en 5/5 folds; también se redujo la brecha. **Decisión:** Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+- **`smote_pacientes_XGB_ratio0.5_k5`** frente a `balanceo_pacientes_XGB_escala`: SMOTE objetivo 50% de mayoritaria; k=5. F1 0,4451 → 0,4818 (Δ 0,0367); DE 0,0210; brecha 0,3148 (Δ -0,0397); entrenamiento 8,3130 s (Δ 2,8146 s). N3: ΔF1 +0.1428, Δprecisión -0.0607, Δrecuperación +0.2436; W: ΔF1 -0.0364, Δprecisión -0.0106, Δrecuperación -0.0550. **Conclusión:** Mayor F1 promedio en 5/5 folds; también se redujo la brecha. **Decisión:** Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+- **`smote_pacientes_XGB_ratio1.0_k3`** frente a `balanceo_pacientes_XGB_escala`: SMOTE objetivo 100% de mayoritaria; k=3. F1 0,4451 → 0,4860 (Δ 0,0409); DE 0,0225; brecha 0,2911 (Δ -0,0635); entrenamiento 12,7084 s (Δ 7,2101 s). N3: ΔF1 +0.1501, Δprecisión -0.1005, Δrecuperación +0.3182; N2: ΔF1 -0.0424, Δprecisión +0.0856, Δrecuperación -0.1656. **Conclusión:** Mayor F1 promedio en 5/5 folds; también se redujo la brecha. **Decisión:** Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+- **`smote_pacientes_XGB_ratio1.0_k5`** frente a `balanceo_pacientes_XGB_escala`: SMOTE objetivo 100% de mayoritaria; k=5. F1 0,4451 → 0,4806 (Δ 0,0355); DE 0,0218; brecha 0,2926 (Δ -0,0620); entrenamiento 12,9639 s (Δ 7,4656 s). N3: ΔF1 +0.1414, Δprecisión -0.1133, Δrecuperación +0.3033; N2: ΔF1 -0.0454, Δprecisión +0.0823, Δrecuperación -0.1683. **Conclusión:** Mayor F1 promedio en 5/5 folds; también se redujo la brecha. **Decisión:** Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+#### Epochs mezclados
+
+**Pesos**
+
+- **`epochs_Logistica_pesos1`** frente a `epochs_Logistica_pesos0`: Sin pesos → pesos balanceados. F1 0,2816 → 0,4061 (Δ 0,1245); DE 0,0026; brecha 0,0021 (Δ 0,0013); entrenamiento 2,0872 s (Δ -0,9688 s). REM: ΔF1 +0.3633, Δprecisión +0.0021, Δrecuperación +0.7262; N2: ΔF1 -0.1869, Δprecisión +0.2653, Δrecuperación -0.5533. **Conclusión:** Mayor F1 promedio en 5/5 folds; la brecha no se redujo claramente. **Decisión:** Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+- **`epochs_RF_pesos1`** frente a `epochs_RF_pesos0`: Sin pesos → pesos balanceados. F1 0,7617 → 0,7860 (Δ 0,0243); DE 0,0081; brecha 0,1745 (Δ -0,0531); entrenamiento 8,3773 s (Δ -26,1677 s). N1: ΔF1 +0.1127, Δprecisión -0.1419, Δrecuperación +0.2509; N3: ΔF1 -0.0100, Δprecisión -0.1657, Δrecuperación +0.1419. **Conclusión:** Mayor F1 promedio en 5/5 folds; también se redujo la brecha. **Decisión:** Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+- **`epochs_XGB_pesos1`** frente a `epochs_XGB_pesos0`: Sin pesos → pesos balanceados. F1 0,7418 → 0,7273 (Δ -0,0145); DE 0,0052; brecha 0,0441 (Δ -0,0069); entrenamiento 5,4388 s (Δ 0,4929 s). N1: ΔF1 +0.0832, Δprecisión -0.1617, Δrecuperación +0.2937; N3: ΔF1 -0.1014, Δprecisión -0.2923, Δrecuperación +0.1753. **Conclusión:** Menor F1 promedio; mejoró en 0/5 folds. La menor brecha no compensó la pérdida de validación. **Decisión:** No priorizar para esta ronda según F1 macro.
+
+**Protocolo**
+
+- **`epochs_Baseline_pesos0`** frente a `pacientes_Baseline_pesos0`: Pacientes separados → Epochs mezclados. F1 0,1368 → 0,1371 (Δ 0,0003); DE 0,0000; brecha 0,0000 (Δ -0,0003); entrenamiento 0,0303 s (Δ -0,0342 s). N2: ΔF1 +0.0014, Δprecisión +0.0011, Δrecuperación +0.0000; W: ΔF1 +0.0000, Δprecisión +0.0000, Δrecuperación +0.0000. **Conclusión:** Cambia la separación de pacientes y epochs; la mezcla comparte personas y no demuestra mejor generalización. **Decisión:** Interpretar cada escenario por separado; no elegir por la mayor cifra entre protocolos.
+
+- **`epochs_Logistica_pesos0`** frente a `pacientes_Logistica_pesos0`: Pacientes separados → Epochs mezclados. F1 0,2610 → 0,2816 (Δ 0,0206); DE 0,0053; brecha 0,0008 (Δ -0,0367); entrenamiento 3,0561 s (Δ 0,1396 s). N3: ΔF1 +0.0406, Δprecisión +0.2226, Δrecuperación +0.0211; REM: ΔF1 -0.0035, Δprecisión +0.0772, Δrecuperación -0.0061. **Conclusión:** Cambia la separación de pacientes y epochs; la mezcla comparte personas y no demuestra mejor generalización. **Decisión:** Interpretar cada escenario por separado; no elegir por la mayor cifra entre protocolos.
+
+- **`epochs_Logistica_pesos1`** frente a `pacientes_Logistica_pesos1`: Pacientes separados → Epochs mezclados. F1 0,3467 → 0,4061 (Δ 0,0594); DE 0,0026; brecha 0,0021 (Δ -0,0708); entrenamiento 2,0872 s (Δ -0,2471 s). N1: ΔF1 +0.0842, Δprecisión +0.0593, Δrecuperación +0.0884; REM: ΔF1 +0.0275, Δprecisión +0.0069, Δrecuperación +0.0801. **Conclusión:** Cambia la separación de pacientes y epochs; la mezcla comparte personas y no demuestra mejor generalización. **Decisión:** Interpretar cada escenario por separado; no elegir por la mayor cifra entre protocolos.
+
+- **`epochs_RF_pesos0`** frente a `pacientes_RF_pesos0`: Pacientes separados → Epochs mezclados. F1 0,3847 → 0,7617 (Δ 0,3770); DE 0,0083; brecha 0,2276 (Δ -0,3771); entrenamiento 34,5450 s (Δ -7,3368 s). N3: ΔF1 +0.6578, Δprecisión +0.1192, Δrecuperación +0.6555; N2: ΔF1 +0.0946, Δprecisión +0.1137, Δrecuperación +0.0663. **Conclusión:** Cambia la separación de pacientes y epochs; la mezcla comparte personas y no demuestra mejor generalización. **Decisión:** Interpretar cada escenario por separado; no elegir por la mayor cifra entre protocolos.
+
+- **`epochs_RF_pesos1`** frente a `pacientes_RF_pesos1`: Pacientes separados → Epochs mezclados. F1 0,4412 → 0,7860 (Δ 0,3447); DE 0,0081; brecha 0,1745 (Δ -0,3446); entrenamiento 8,3773 s (Δ -23,8078 s). REM: ΔF1 +0.5335, Δprecisión +0.4968, Δrecuperación +0.5538; N2: ΔF1 +0.1121, Δprecisión +0.1218, Δrecuperación +0.1022. **Conclusión:** Cambia la separación de pacientes y epochs; la mezcla comparte personas y no demuestra mejor generalización. **Decisión:** Interpretar cada escenario por separado; no elegir por la mayor cifra entre protocolos.
+
+- **`epochs_XGB_pesos0`** frente a `pacientes_XGB_pesos0`: Pacientes separados → Epochs mezclados. F1 0,4465 → 0,7418 (Δ 0,2954); DE 0,0077; brecha 0,0510 (Δ -0,3080); entrenamiento 4,9458 s (Δ -9,4719 s). N3: ΔF1 +0.4717, Δprecisión +0.3049, Δrecuperación +0.5092; N2: ΔF1 +0.0726, Δprecisión +0.0772, Δrecuperación +0.0654. **Conclusión:** Cambia la separación de pacientes y epochs; la mezcla comparte personas y no demuestra mejor generalización. **Decisión:** Interpretar cada escenario por separado; no elegir por la mayor cifra entre protocolos.
+
+- **`epochs_XGB_pesos1`** frente a `pacientes_XGB_pesos1`: Pacientes separados → Epochs mezclados. F1 0,4859 → 0,7273 (Δ 0,2414); DE 0,0052; brecha 0,0441 (Δ -0,2533); entrenamiento 5,4388 s (Δ -8,8586 s). REM: ΔF1 +0.3791, Δprecisión +0.3271, Δrecuperación +0.4023; N2: ΔF1 +0.0741, Δprecisión +0.0771, Δrecuperación +0.0699. **Conclusión:** Cambia la separación de pacientes y epochs; la mezcla comparte personas y no demuestra mejor generalización. **Decisión:** Interpretar cada escenario por separado; no elegir por la mayor cifra entre protocolos.
+
+**Hiperparámetro**
+
+- **`epochs_ajuste_RF_pesos0_max_depth_16`** frente a `epochs_RF_pesos0`: max_depth=16. F1 0,7617 → 0,6766 (Δ -0,0852); DE 0,0067; brecha 0,1652 (Δ -0,0624); entrenamiento 33,3766 s (Δ -1,1684 s). W: ΔF1 -0.0374, Δprecisión +0.0016, Δrecuperación -0.0745; REM: ΔF1 -0.1538, Δprecisión +0.0073, Δrecuperación -0.2456. **Conclusión:** Menor F1 promedio; mejoró en 0/5 folds. La menor brecha no compensó la pérdida de validación. **Decisión:** No priorizar para esta ronda según F1 macro.
+
+- **`epochs_ajuste_RF_pesos0_min_samples_leaf_10`** frente a `epochs_RF_pesos0`: min_samples_leaf=10. F1 0,7617 → 0,7071 (Δ -0,0546); DE 0,0076; brecha 0,1053 (Δ -0,1223); entrenamiento 26,0084 s (Δ -8,5366 s). N2: ΔF1 -0.0199, Δprecisión -0.0375, Δrecuperación +0.0043; N1: ΔF1 -0.1037, Δprecisión +0.0078, Δrecuperación -0.1030. **Conclusión:** Menor F1 promedio; mejoró en 0/5 folds. La menor brecha no compensó la pérdida de validación. **Decisión:** No priorizar para esta ronda según F1 macro.
+
+- **`epochs_ajuste_RF_pesos1_max_depth_16`** frente a `epochs_RF_pesos1`: max_depth=16. F1 0,7860 → 0,7215 (Δ -0,0645); DE 0,0064; brecha 0,1337 (Δ -0,0408); entrenamiento 7,2154 s (Δ -1,1619 s). N3: ΔF1 -0.0241, Δprecisión -0.0491, Δrecuperación +0.0153; REM: ΔF1 -0.1631, Δprecisión -0.2621, Δrecuperación +0.0040. **Conclusión:** Menor F1 promedio; mejoró en 0/5 folds. La menor brecha no compensó la pérdida de validación. **Decisión:** No priorizar para esta ronda según F1 macro.
+
+- **`epochs_ajuste_RF_pesos1_min_samples_leaf_10`** frente a `epochs_RF_pesos1`: min_samples_leaf=10. F1 0,7860 → 0,7303 (Δ -0,0556); DE 0,0059; brecha 0,0996 (Δ -0,0748); entrenamiento 7,4888 s (Δ -0,8885 s). W: ΔF1 -0.0335, Δprecisión -0.0160, Δrecuperación -0.0513; N3: ΔF1 -0.0910, Δprecisión -0.1571, Δrecuperación +0.0367. **Conclusión:** Menor F1 promedio; mejoró en 0/5 folds. La menor brecha no compensó la pérdida de validación. **Decisión:** No priorizar para esta ronda según F1 macro.
+
+- **`epochs_ajuste_XGB_pesos0_max_depth_2`** frente a `epochs_XGB_pesos0`: max_depth=2. F1 0,7418 → 0,6408 (Δ -0,1010); DE 0,0092; brecha 0,0156 (Δ -0,0353); entrenamiento 3,8709 s (Δ -1,0750 s). N2: ΔF1 -0.0329, Δprecisión -0.0539, Δrecuperación -0.0045; REM: ΔF1 -0.1483, Δprecisión -0.1209, Δrecuperación -0.1688. **Conclusión:** Menor F1 promedio; mejoró en 0/5 folds. La menor brecha no compensó la pérdida de validación. **Decisión:** No priorizar para esta ronda según F1 macro.
+
+- **`epochs_ajuste_XGB_pesos0_reg_lambda_5`** frente a `epochs_XGB_pesos0`: reg_lambda=5. F1 0,7418 → 0,7376 (Δ -0,0042); DE 0,0065; brecha 0,0499 (Δ -0,0010); entrenamiento 5,6363 s (Δ 0,6904 s). W: ΔF1 -0.0002, Δprecisión -0.0006, Δrecuperación +0.0003; N1: ΔF1 -0.0085, Δprecisión -0.0074, Δrecuperación -0.0081. **Conclusión:** Menor F1 promedio; mejoró en 1/5 folds. La menor brecha no compensó la pérdida de validación. **Decisión:** No priorizar para esta ronda según F1 macro.
+
+- **`epochs_ajuste_XGB_pesos1_max_depth_2`** frente a `epochs_XGB_pesos1`: max_depth=2. F1 0,7273 → 0,6119 (Δ -0,1154); DE 0,0073; brecha 0,0137 (Δ -0,0304); entrenamiento 4,0553 s (Δ -1,3834 s). N2: ΔF1 -0.0724, Δprecisión -0.0321, Δrecuperación -0.0956; N3: ΔF1 -0.1926, Δprecisión -0.2136, Δrecuperación -0.0044. **Conclusión:** Menor F1 promedio; mejoró en 0/5 folds. La menor brecha no compensó la pérdida de validación. **Decisión:** No priorizar para esta ronda según F1 macro.
+
+- **`epochs_ajuste_XGB_pesos1_reg_lambda_5`** frente a `epochs_XGB_pesos1`: reg_lambda=5. F1 0,7273 → 0,7231 (Δ -0,0042); DE 0,0055; brecha 0,0431 (Δ -0,0010); entrenamiento 5,4835 s (Δ 0,0447 s). W: ΔF1 -0.0019, Δprecisión -0.0014, Δrecuperación -0.0023; N1: ΔF1 -0.0061, Δprecisión -0.0056, Δrecuperación -0.0064. **Conclusión:** Menor F1 promedio; mejoró en 0/5 folds. **Decisión:** No priorizar para esta ronda según F1 macro.
+
+**Control**
+
+- **`epochs_representacion_RF_candidata`** frente a `epochs_RF_pesos1`: candidata. F1 0,7860 → 0,7860 (Δ 0,0000); DE 0,0081; brecha 0,1745 (Δ 0,0000); entrenamiento 8,3773 s (Δ 0,0000 s). REM: ΔF1 +0.0000, Δprecisión +0.0000, Δrecuperación +0.0000; W: ΔF1 +0.0000, Δprecisión +0.0000, Δrecuperación +0.0000. **Conclusión:** Repetición de la misma configuración y entradas; las diferencias de tiempo no son efecto de un hiperparámetro. **Decisión:** Usar como control de representación; no contar como mejora nueva.
+
+- **`epochs_representacion_XGB_candidata`** frente a `epochs_XGB_pesos0`: candidata. F1 0,7418 → 0,7418 (Δ 0,0000); DE 0,0077; brecha 0,0510 (Δ 0,0000); entrenamiento 4,9458 s (Δ 0,0000 s). REM: ΔF1 +0.0000, Δprecisión +0.0000, Δrecuperación +0.0000; W: ΔF1 +0.0000, Δprecisión +0.0000, Δrecuperación +0.0000. **Conclusión:** Repetición de la misma configuración y entradas; las diferencias de tiempo no son efecto de un hiperparámetro. **Decisión:** Usar como control de representación; no contar como mejora nueva.
+
+**Representación**
+
+- **`epochs_representacion_RF_separada_con_log`** frente a `epochs_RF_pesos1`: separada_con_log. F1 0,7860 → 0,7835 (Δ -0,0024); DE 0,0072; brecha 0,1781 (Δ 0,0036); entrenamiento 11,6642 s (Δ 3,2869 s). N3: ΔF1 +0.0027, Δprecisión +0.0046, Δrecuperación +0.0000; N1: ΔF1 -0.0063, Δprecisión -0.0026, Δrecuperación -0.0105. **Conclusión:** Menor F1 promedio; mejoró en 2/5 folds. **Decisión:** No priorizar para esta ronda según F1 macro.
+
+- **`epochs_representacion_XGB_separada_con_log`** frente a `epochs_XGB_pesos0`: separada_con_log. F1 0,7418 → 0,7424 (Δ 0,0006); DE 0,0087; brecha 0,0548 (Δ 0,0039); entrenamiento 5,7990 s (Δ 0,8531 s). REM: ΔF1 +0.0048, Δprecisión +0.0059, Δrecuperación +0.0038; N3: ΔF1 -0.0038, Δprecisión -0.0071, Δrecuperación -0.0011. **Conclusión:** Mayor F1 promedio en 3/5 folds; la brecha no se redujo claramente. La ventaja media es pequeña, sin prueba de superioridad estadística. **Decisión:** Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+**Contexto temporal**
+
+- **`contexto_epochs_RF_lag_1`** frente a `epochs_RF_pesos1`: Historia 1 minutos. F1 0,7860 → 0,7854 (Δ -0,0005); DE 0,0061; brecha 0,1822 (Δ 0,0078); entrenamiento 13,7773 s (Δ 5,4000 s). N3: ΔF1 +0.0157, Δprecisión +0.0245, Δrecuperación +0.0033; N1: ΔF1 -0.0145, Δprecisión -0.0017, Δrecuperación -0.0292. **Conclusión:** Menor F1 promedio; mejoró en 2/5 folds. **Decisión:** No priorizar para esta ronda según F1 macro.
+
+- **`contexto_epochs_RF_lag_2`** frente a `epochs_RF_pesos1`: Historia 2 minutos. F1 0,7860 → 0,7802 (Δ -0,0057); DE 0,0087; brecha 0,1868 (Δ 0,0124); entrenamiento 13,7927 s (Δ 5,4154 s). N3: ΔF1 +0.0138, Δprecisión +0.0192, Δrecuperación +0.0060; N1: ΔF1 -0.0172, Δprecisión -0.0029, Δrecuperación -0.0333. **Conclusión:** Menor F1 promedio; mejoró en 0/5 folds. **Decisión:** No priorizar para esta ronda según F1 macro.
+
+- **`contexto_epochs_RF_lag_5`** frente a `epochs_RF_pesos1`: Historia 5 minutos. F1 0,7860 → 0,7795 (Δ -0,0065); DE 0,0060; brecha 0,1877 (Δ 0,0132); entrenamiento 13,4848 s (Δ 5,1075 s). N3: ΔF1 +0.0044, Δprecisión +0.0095, Δrecuperación -0.0027; N1: ΔF1 -0.0161, Δprecisión -0.0020, Δrecuperación -0.0322. **Conclusión:** Menor F1 promedio; mejoró en 0/5 folds. **Decisión:** No priorizar para esta ronda según F1 macro.
+
+- **`contexto_epochs_RF_lag_10`** frente a `epochs_RF_pesos1`: Historia 10 minutos. F1 0,7860 → 0,7841 (Δ -0,0019); DE 0,0062; brecha 0,1827 (Δ 0,0082); entrenamiento 13,2830 s (Δ 4,9057 s). N3: ΔF1 +0.0085, Δprecisión +0.0121, Δrecuperación +0.0033; N1: ΔF1 -0.0112, Δprecisión +0.0023, Δrecuperación -0.0267. **Conclusión:** Menor F1 promedio; mejoró en 1/5 folds. **Decisión:** No priorizar para esta ronda según F1 macro.
+
+- **`contexto_epochs_RF_lag_15`** frente a `epochs_RF_pesos1`: Historia 15 minutos. F1 0,7860 → 0,7888 (Δ 0,0029); DE 0,0045; brecha 0,1777 (Δ 0,0032); entrenamiento 13,6455 s (Δ 5,2682 s). REM: ΔF1 +0.0055, Δprecisión -0.0030, Δrecuperación +0.0153; W: ΔF1 -0.0004, Δprecisión +0.0027, Δrecuperación -0.0036. **Conclusión:** Mayor F1 promedio en 4/5 folds; la brecha no se redujo claramente. La ventaja media es pequeña, sin prueba de superioridad estadística. **Decisión:** Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+- **`contexto_epochs_RF_lag_5+10`** frente a `epochs_RF_pesos1`: Historia 5+10 minutos. F1 0,7860 → 0,7795 (Δ -0,0064); DE 0,0064; brecha 0,1910 (Δ 0,0165); entrenamiento 17,6509 s (Δ 9,2736 s). N3: ΔF1 +0.0056, Δprecisión +0.0133, Δrecuperación -0.0049; N1: ΔF1 -0.0209, Δprecisión +0.0000, Δrecuperación -0.0443. **Conclusión:** Menor F1 promedio; mejoró en 0/5 folds. **Decisión:** No priorizar para esta ronda según F1 macro.
+
+- **`contexto_epochs_RF_lag_1+15`** frente a `epochs_RF_pesos1`: Historia 1+15 minutos (dos mejores individuales). F1 0,7860 → 0,7852 (Δ -0,0008); DE 0,0053; brecha 0,1851 (Δ 0,0106); entrenamiento 18,1138 s (Δ 9,7364 s). N3: ΔF1 +0.0125, Δprecisión +0.0207, Δrecuperación +0.0011; N1: ΔF1 -0.0104, Δprecisión +0.0042, Δrecuperación -0.0271. **Conclusión:** Menor F1 promedio; mejoró en 2/5 folds. **Decisión:** No priorizar para esta ronda según F1 macro.
+
+**Balanceo control**
+
+- **`balanceo_epochs_RF_sin_pesos`** frente a `epochs_RF_pesos1`: Misma configuración sin ponderación. F1 0,7860 → 0,7617 (Δ -0,0243); DE 0,0083; brecha 0,2276 (Δ 0,0531); entrenamiento 34,5450 s (Δ 26,1677 s). N3: ΔF1 +0.0100, Δprecisión +0.1657, Δrecuperación -0.1419; N1: ΔF1 -0.1127, Δprecisión +0.1419, Δrecuperación -0.2509. **Conclusión:** Menor F1 promedio; mejoró en 0/5 folds. **Decisión:** No priorizar para esta ronda según F1 macro.
+
+- **`balanceo_epochs_RF_pesos`** frente a `balanceo_epochs_RF_sin_pesos`: Misma configuración con pesos balanceados. F1 0,7617 → 0,7860 (Δ 0,0243); DE 0,0081; brecha 0,1745 (Δ -0,0531); entrenamiento 8,3773 s (Δ -26,1677 s). N1: ΔF1 +0.1127, Δprecisión -0.1419, Δrecuperación +0.2509; N3: ΔF1 -0.0100, Δprecisión -0.1657, Δrecuperación +0.1419. **Conclusión:** Mayor F1 promedio en 5/5 folds; también se redujo la brecha. **Decisión:** Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+- **`balanceo_epochs_RF_escala`** frente a `balanceo_epochs_RF_sin_pesos`: Escalado sin remuestreo ni pesos. F1 0,7617 → 0,7645 (Δ 0,0028); DE 0,0112; brecha 0,2245 (Δ -0,0031); entrenamiento 12,5734 s (Δ -21,9716 s). N1: ΔF1 +0.0136, Δprecisión +0.0112, Δrecuperación +0.0124; REM: ΔF1 -0.0083, Δprecisión -0.0105, Δrecuperación -0.0064. **Conclusión:** Mayor F1 promedio en 4/5 folds; también se redujo la brecha. La ventaja media es pequeña, sin prueba de superioridad estadística. **Decisión:** Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+**SMOTE**
+
+- **`smote_epochs_RF_ratio0.5_k3`** frente a `balanceo_epochs_RF_escala`: SMOTE objetivo 50% de mayoritaria; k=3. F1 0,7645 → 0,7924 (Δ 0,0279); DE 0,0089; brecha 0,2028 (Δ -0,0217); entrenamiento 20,3864 s (Δ 7,8131 s). N1: ΔF1 +0.0939, Δprecisión -0.0927, Δrecuperación +0.1708; N2: ΔF1 +0.0045, Δprecisión +0.0398, Δrecuperación -0.0366. **Conclusión:** Mayor F1 promedio en 5/5 folds; también se redujo la brecha. **Decisión:** Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+- **`smote_epochs_RF_ratio0.5_k5`** frente a `balanceo_epochs_RF_escala`: SMOTE objetivo 50% de mayoritaria; k=5. F1 0,7645 → 0,7910 (Δ 0,0265); DE 0,0081; brecha 0,2040 (Δ -0,0205); entrenamiento 20,6019 s (Δ 8,0285 s). N1: ΔF1 +0.0866, Δprecisión -0.1024, Δrecuperación +0.1654; N2: ΔF1 +0.0042, Δprecisión +0.0395, Δrecuperación -0.0370. **Conclusión:** Mayor F1 promedio en 5/5 folds; también se redujo la brecha. **Decisión:** Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+- **`smote_epochs_RF_ratio1.0_k3`** frente a `balanceo_epochs_RF_escala`: SMOTE objetivo 100% de mayoritaria; k=3. F1 0,7645 → 0,7995 (Δ 0,0349); DE 0,0059; brecha 0,1958 (Δ -0,0287); entrenamiento 38,7379 s (Δ 26,1645 s). N1: ΔF1 +0.1121, Δprecisión -0.1396, Δrecuperación +0.2511; N2: ΔF1 +0.0014, Δprecisión +0.0738, Δrecuperación -0.0763. **Conclusión:** Mayor F1 promedio en 5/5 folds; también se redujo la brecha. **Decisión:** Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+- **`smote_epochs_RF_ratio1.0_k5`** frente a `balanceo_epochs_RF_escala`: SMOTE objetivo 100% de mayoritaria; k=5. F1 0,7645 → 0,8006 (Δ 0,0360); DE 0,0038; brecha 0,1947 (Δ -0,0298); entrenamiento 38,1493 s (Δ 25,5759 s). N1: ΔF1 +0.1186, Δprecisión -0.1411, Δrecuperación +0.2675; N2: ΔF1 +0.0008, Δprecisión +0.0768, Δrecuperación -0.0803. **Conclusión:** Mayor F1 promedio en 5/5 folds; también se redujo la brecha. **Decisión:** Conservar como candidato de esta ronda; no afirmar un óptimo global.
+
+### Comparación posterior en test histórico
+
+En los mismos 16 pacientes, el candidato seleccionado mediante **pacientes separados** obtuvo el mayor F1 macro. Diferencia epochs menos pacientes: **-0,0426**. Las validaciones no se comparan como si midieran generalización equivalente. La diferencia en test corresponde a estos candidatos concretos; pueden cambiar algoritmo, entradas y parámetros además del protocolo. No se realizaron reajustes posteriores.
+
+El test ya había sido consultado y tuvo exposición histórica en EDA/comparaciones de la cohorte completa. Esta es una comparación posterior sobre personas excluidas de los nuevos entrenamientos, **no una nueva prueba independiente**. No se usó para seleccionar ni reajustar los candidatos de esta ronda. La selección entre muchas pruebas puede optimizar en exceso la validación.
+
+Al mezclar epochs se comparten personas y observaciones próximas. Con historia, un antecedente puede contener señales de otro fold; no contiene su etiqueta, pero la dependencia puede favorecer las métricas. Las etapas ausentes y las distintas duraciones limitan comparaciones individuales. Los modelos utilizan wearable + PSG; no demuestran rendimiento solo wearable.
+
+## Evidencia histórica · notebook oficial previo
+
+Lo siguiente conserva parámetros y resultados de otra ronda, incluidos otros protocolos. No es el estado activo ni una comparación controlada con la revisión.
+
+
+
+Lo siguiente conserva parámetros y resultados de otra ronda, incluidos otros protocolos. No es el estado activo ni una comparación controlada con la revisión.
 
 El [notebook](../../temporal_version_tp_entrega03.ipynb) define las configuraciones y exporta las salidas completas. Esta guía mantiene interpretación y conclusiones. Los valores son candidatos, no óptimos comprobados.
 
