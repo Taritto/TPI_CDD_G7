@@ -1,6 +1,6 @@
 # Contexto común del proyecto
 
-Objetivo: identificar la etapa del epoch actual de 30 segundos (W, N1, N2, N3 o REM) usando señales de wearable + PSG de DREAMT como escenario principal, con la etapa anotada por PSG como referencia. Solo wearable se estudiará como comparación secundaria con un modelo independiente y las mismas particiones y métricas. La etapa objetivo es categórica. Cada entrega documenta sus propios resultados; las [decisiones comunes](../adr/README.md) mantienen las reglas que siguen aplicándose.
+Objetivo: identificar la etapa del epoch actual de 30 segundos (W, N1, N2, N3 o REM) usando señales de wearable + PSG de DREAMT, con la etapa anotada por PSG como referencia. La entrega 3 se limita al escenario combinado wearable + PSG. La etapa objetivo es categórica. Cada entrega documenta sus propios resultados; las [decisiones comunes](../adr/README.md) mantienen las reglas que siguen aplicándose.
 
 ## Fuentes y materiales
 
@@ -11,7 +11,7 @@ Objetivo: identificar la etapa del epoch actual de 30 segundos (W, N1, N2, N3 o 
 
 ## Trabajo en equipo
 
-El [notebook principal](../../temporal_version_tp_cdd.ipynb) contiene código y salidas. Una ejecución local con menos archivos no reemplaza la corrida completa de Kaggle. Dataset, auditorías y manifiesto deben corresponder a una misma ejecución. CSV crudos y salidas regenerables de `etl_v1/` permanecen fuera de Git.
+El [notebook de entregas 1–2](../../temporal_version_tp_cdd_entrega01-02.ipynb) conserva ETL y análisis; la [entrega 3](../entrega-03/README.md) identifica el notebook de modelado y su copia de revisión. Una ejecución local con menos archivos no reemplaza la corrida completa de Kaggle. Dataset, auditorías y manifiesto deben corresponder a una misma ejecución. CSV crudos y salidas regenerables de `etl_v1/` permanecen fuera de Git.
 
 El ETL base y la copia candidata representan los mismos epochs: no concatenarlos como observaciones nuevas. Conservar la versión guardada de Kaggle y el commit correspondiente al cerrar cada entrega. Git conserva la historia; evitar notebooks «final2» y copias completas de documentación.
 
@@ -23,4 +23,4 @@ El `participant_info.csv` compartido por el equipo contiene 100 participantes y 
 
 El contexto clínico y el entorno de medición son factores plausibles para discutir la representatividad, pero no demuestran la causa de la baja proporción de N3 observada. No afirmar que pacientes concretos no alcanzaron etapas por los cables, el laboratorio o la apnea sin un análisis específico.
 
-Estos metadatos no se agregan como entradas del modelo wearable. En especial, `AHI`, `OAHI` y `Arousal Index` se obtienen del estudio clínico y no deben introducirse inadvertidamente como información disponible del wearable. Si se evalúan subgrupos, unir `SID` con `patient_id` validando identidad y cobertura, usar inicialmente solo pacientes de desarrollo y señalar tamaños por grupo. No examinar resultados por subgrupo de la prueba reservada para decidir ajustes.
+Estos metadatos no se agregan como entradas del modelo wearable + PSG. En especial, `AHI`, `OAHI` y `Arousal Index` se obtienen del estudio clínico y no deben introducirse inadvertidamente como información disponible del wearable. Si se evalúan subgrupos, unir `SID` con `patient_id` validando identidad y cobertura, usar inicialmente solo pacientes de desarrollo y señalar tamaños por grupo. No examinar resultados por subgrupo de la prueba reservada para decidir ajustes.

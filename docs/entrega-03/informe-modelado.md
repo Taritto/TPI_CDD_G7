@@ -1,5 +1,7 @@
 # Informe de modelado · decisiones y exposición
 
+> **Referencia del notebook oficial previo.** Este documento conserva resultados y decisiones de esa versión. La copia de revisión está implementada pero pendiente de ejecución completa; consultar el [estado vigente](README.md). Las menciones de evaluación cronológica, solo wearable o pendientes antiguos describen ese estado anterior y no forman parte del alcance de la revisión.
+
 ## Objetivo y alcance
 
 Predecir la etapa del sueño de un epoch de 30 segundos: W, N1, N2, N3 o REM. El notebook recibe dos CSV ya preparados; no reconstruye señales ni repite EDA/ETL. El escenario actual dispone de wearable y PSG: no demuestra desempeño de un dispositivo wearable aislado.

@@ -7,32 +7,44 @@ date: 2026-09-29
 
 ## Implementación vigente
 
-La entrega 2 comprende preparación, análisis y copia candidata. El [notebook autónomo de entrega 3](../../temporal_version_tp_entrega03.ipynb) implementa el flujo de modelado. La referencia anterior se preservó con código/salidas. Se amplió la decisión a dos escenarios: personas nuevas y futuras lecturas de pacientes conocidos. Se congeló y evaluó una vez el candidato para personas nuevas; la prueba temporal independiente de pacientes conocidos sigue pendiente. Estado y resultados en [entrega 3](../entrega-03/README.md).
+La entrega 2 comprende preparación, análisis y copia candidata. El [notebook oficial de entrega 3](../../temporal_version_tp_entrega03.ipynb) queda como referencia mientras el equipo revisa la [copia con los ajustes acordados](../../temporal_version_tp_entrega03_revision.ipynb). Los resultados y el estado de ejecución de esa copia se documentan en [entrega 3](../entrega-03/README.md).
+
+La revisión retira la evaluación cronológica y la propuesta solo wearable. Conserva el código y las salidas de la antigua 4.8 como evaluación histórica. La fecha del ADR registra la decisión original y se conserva; estas modificaciones reflejan las decisiones posteriores aprobadas por el equipo.
 
 ## Decisión y motivo
 
-Clasificación multiclase, no ordinal. Los mapas descriptivos no demuestran rendimiento predictivo. Separar implementado y ejecutado; comparar Dummy, logística, RF y XGB. Escalado y pesos solo se ajustan con entrenamiento.
+Identificar la etapa del epoch actual de 30 segundos con wearable + PSG. Es clasificación multiclase categórica; las asociaciones descriptivas no demuestran capacidad predictiva. Comparar Dummy, logística, RF y XGBoost. Ningún algoritmo se considera ganador antes de medirlo.
 
-Reservar aproximadamente 20 % de pacientes completos para test interno, semilla 42, sin compartir pacientes con desarrollo. Dentro de desarrollo, comparar cinco folds StratifiedGroupKFold por paciente frente a StratifiedKFold por epochs mezclados con configuraciones fijas. Conservar esta mezcla como diagnóstico, sin elegir por la cifra más alta entre protocolos. Por decisión explícita del usuario, seleccionar candidatos separados para personas nuevas y pacientes conocidos; no se consultó test. Ambos modelos predicen epochs, no cambia la unidad de predicción.
+Conservar la asignación de aproximadamente 20 % de pacientes al test interno, semilla 42. Estos 16 pacientes ya se evaluaron y no se usan para nuevos ajustes. Dentro de los 60 pacientes de desarrollo, seleccionar un candidato con cinco folds de StratifiedGroupKFold agrupados por patient_id y otro con cinco folds de StratifiedKFold por epochs mezclados. Cada protocolo reutiliza sus propias particiones y el mismo catálogo de alternativas.
 
-Personas nuevas: validación por pacientes separados. Pacientes conocidos: seis bloques cronológicos por persona, el primero inicializa entrenamiento y los cinco siguientes se evalúan con entrenamiento creciente; separar entrenamiento y validación por 15 minutos. Los epochs iniciales no tienen predicción OOF. Guardar elegibilidad, cobertura y asignaciones. El mismo catálogo de variantes se evalúa dentro de ambos escenarios; cada escenario tiene su propia selección.
+Solo pacientes separados garantiza que el modelo de cada fold no entrenó con esa persona. Epochs mezclados puede compartir sujetos y observaciones próximas: sus cifras no demuestran mejor generalización a pacientes nuevos. Se conservan ambos candidatos para compararlos sobre las mismas personas adicionales, fijando las configuraciones antes de acceder a esas nuevas etiquetas. La comparación contrasta candidatos concretos; no demuestra superioridad universal de un protocolo.
 
-El escenario conocido presupone observaciones pasadas etiquetadas disponibles para entrenar; recibir señales pasadas sin anotaciones no implica que el modelo conozca a esa persona. Las etiquetas de entrenamiento no se incorporan como características de historia durante inferencia.
+## Selección, características y balanceo
 
-Contexto temporal: señales anteriores del mismo paciente y segmento continuo, nunca etiquetas reales previas ni datos futuros. Historia ausente se conserva como NaN con indicador de disponibilidad; imputación aprendida dentro del entrenamiento. SMOTE se prueba por separado y únicamente dentro del entrenamiento. Reglas de balanceo en [ADR 0009](0009-distribuciones-y-desbalance-de-etapas.md).
+Variar un hiperparámetro por vez respecto de su referencia, sin producto cartesiano ni duplicados. Acotar la búsqueda a dos cambios individuales por algoritmo: RF (`max_depth=16`, `min_samples_leaf=10`) y XGBoost (`max_depth=2`, `reg_lambda=5`), en ambos protocolos y con/sin pesos. Logística permanece como referencia, sin búsqueda de C. Es una exploración acotada por costo, no una búsqueda exhaustiva. Después contrastar representaciones, contexto temporal y balanceo. Elegir por F1 macro promedio de validación; desempates por dispersión, tiempo y nombre. Conservar el mejor RF y XGBoost base para importancia por permutación; historia y balanceo parten de un único ganador base por protocolo.
 
-El test interno tuvo exposición en EDA y comparaciones previas: declarar esta limitación. Congelar configuración, reentrenar con todo desarrollo y evaluar sin reajuste posterior. Guardar marcador persistente con estados reservado/abierto/evaluado: un estado incompleto bloquea reintentos automáticos; resultados completos se verifican mediante huellas y se leen sin entrenar ni inferir de nuevo. Persistir probabilidades y clases antes de calcular métricas, que se reconstruyen desde ese archivo. Guardar pipeline con imputación y modelo, comprobar serialización en desarrollo y conservar configuración/columnas/versiones congeladas. Pacientes adicionales futuros permitirán evaluación externa separada. Detalle operativo en el README de entrega 3.
+Contexto temporal: señales pasadas del mismo paciente y segmento continuo, nunca etiquetas anteriores ni señales futuras. Una discontinuidad reinicia la historia; falta de antecedentes conserva NaN e indicador. La mediana se aprende dentro del entrenamiento. Al mezclar epochs, los retardos pueden compartir señales entre folds aunque sean causales.
 
-## Alternativas y criterio de comparación
+Escalado, imputación, pesos y SMOTE se ajustan exclusivamente con entrenamiento. SMOTE se estudia sin historia ni pesos adicionales; validación y métricas de entrenamiento se calculan sobre observaciones reales. Reglas de balanceo en [ADR 0009](0009-distribuciones-y-desbalance-de-etapas.md).
 
-Una división única por paciente es más económica, pero depende más de los pacientes asignados; `GroupKFold` mantiene separados los pacientes sin intentar conservar las proporciones de etapas. Se conserva StratifiedGroupKFold para personas desconocidas y validación cronológica para el futuro de personas conocidas. No hay ganador universal entre ambas preguntas.
+## Diagnóstico y prueba adicional
 
-El clasificador trivial permite saber qué se logra sin distinguir etapas; regresión logística multiclase ofrece una referencia inicial y Random Forest/XGBoost permiten contrastar relaciones no lineales e interacciones. Son candidatos, no ganadores aprobados ni requisitos específicos de la cátedra.
+Guardar una predicción y probabilidades OOF por epoch, configuración y protocolo. Distinguir promedio entre folds de métricas acumuladas. Informar F1 macro, precisión/recuperación/F1 por etapa, matrices, ROC-AUC y resultados por paciente con cobertura de etapas. Retirar Precision–Recall/AP de los diagnósticos activos; las salidas históricas quedan preservadas.
 
-Comparar escenarios y representaciones con las mismas particiones del protocolo elegido. La validación orienta modelos, parámetros y características; reservar la prueba para la evaluación final acordada. Informar F1 macro, matriz de confusión, precisión/recuperación por etapa y variación entre pacientes. La elección debe considerar desempeño y disponibilidad real de señales, especialmente si se propone usar solo wearable.
+El test interno tuvo exposición en EDA y comparaciones previas: declarar esta limitación. Su evaluación histórica conserva código y resultados, sin reentrenar ni inferir allí. No transferir sus métricas a candidatos nuevos.
 
-Guardar predicciones y probabilidades de validación por fold, configuración y escenario: cada epoch elegible se predice una vez por un modelo que no entrenó con su etiqueta. Solo el protocolo por pacientes garantiza no haber entrenado con su persona; el cronológico utiliza únicamente su pasado. La matriz acumulada y las curvas Precision-Recall complementan métricas por etapa, fold y paciente. El test reservado por personas evalúa el primer escenario y no constituye una prueba cronológica independiente para personas conocidas. Detalle en [entrega 3](../entrega-03/README.md#qué-mirar).
+La comparación adicional requiere pacientes distintos de la cohorte histórica y CSV procesados con las mismas reglas del ETL. Ambos candidatos se entrenan con los mismos 60 pacientes de desarrollo y se evalúan en las mismas personas nuevas. No se reajusta a partir de esta prueba. Sin esas entradas, la comparación queda pendiente.
+
+Conservar configuración, columnas, representación, retardos, balanceo, versiones y fuentes. Persistir pipelines, probabilidades y predicciones. Una ejecución adicional incompleta bloquea reintentos automáticos; una completada verifica huellas y se relee sin entrenar ni inferir. Guardar las nuevas exportaciones por separado de las históricas.
+
+## Alternativas y consecuencias
+
+Una división única por paciente es más económica, pero depende más de las personas asignadas. GroupKFold mantiene grupos sin intentar conservar proporciones. StratifiedGroupKFold intenta distribuir etapas sin garantizar cobertura; comprobarla antes de entrenar. Estratificar no balancea clases.
+
+La evaluación cronológica respondía al uso de pasado etiquetado para predecir períodos futuros del mismo paciente. Se retiró del alcance activo por decisión del equipo, conservando sus versiones anteriores en Git. Los retardos de señales siguen disponibles y no implican realizar ese protocolo de evaluación.
+
+La selección sobre muchos candidatos puede optimizar en exceso los mismos folds; las diferencias pequeñas no prueban superioridad concluyente. La comparación adicional amplía la evidencia y debe reportar ambos resultados, incluso si el candidato seleccionado con epochs mezclados no mantiene su ventaja de validación.
 
 ## Alcance
 
-La consigna disponible ubica selección de técnicas, parámetros, evaluación e interpretación en la tercera entrega. El detalle operativo está en [entrega 3](../entrega-03/README.md); ningún algoritmo queda elegido como ganador antes de medirlo.
+La consigna ubica selección de técnicas, parámetros, evaluación e interpretación en la tercera entrega. La revisión mantiene únicamente wearable + PSG. El detalle operativo y los resultados efectivamente ejecutados viven en la documentación de la entrega; el ADR conserva las reglas y sus motivos.

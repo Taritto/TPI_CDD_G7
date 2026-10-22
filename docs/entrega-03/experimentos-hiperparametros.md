@@ -1,5 +1,7 @@
 # Experimentos de hiperparámetros
 
+> **Referencia del notebook oficial previo.** Este documento conserva resultados y decisiones de esa versión. La copia de revisión está implementada pero pendiente de ejecución completa; consultar el [estado vigente](README.md). Las menciones de evaluación cronológica, solo wearable o pendientes antiguos describen ese estado anterior y no forman parte del alcance de la revisión.
+
 El [notebook](../../temporal_version_tp_entrega03.ipynb) define las configuraciones y exporta las salidas completas. Esta guía mantiene interpretación y conclusiones. Los valores son candidatos, no óptimos comprobados.
 
 ## Método
